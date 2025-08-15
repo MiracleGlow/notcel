@@ -8,14 +8,15 @@ app = Flask(__name__)
 # Konfigurasi
 BASE_DIR = "/tmp/notes"
 os.makedirs(BASE_DIR, exist_ok=True)
-SESSIONS_PER_PAGE = 10 # Jumlah sesi yang ditampilkan per halaman
+SESSIONS_PER_PAGE = 10
 
 # Set ekstensi file
 IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
 VIDEO_EXT = {"mp4", "webm", "ogg", "mov"}
 AUDIO_EXT = {"mp3", "wav", "ogg", "m4a"}
 TEXT_EXT  = {"txt", "md", "log", "py", "json", "csv", "ini"}
-MAX_TEXT_PREVIEW_BYTES = 128 * 1024  # 128 KB
+# Batas aman untuk memuat file teks ke dalam textarea di browser
+MAX_EDITABLE_TEXT_BYTES = 5 * 1024 * 1024  # 5 MB
 
 def safe_session_name(name: str) -> str:
     cleaned = secure_filename(name).strip("._")
@@ -113,17 +114,12 @@ def edit_session(session_name):
         url = url_for('serve_file', session_name=safe_name, filename=fname)
         mimetype, _ = mimetypes.guess_type(fname)
 
-        item = {
-            "name": fname,
-            "url": url,
-            "kind": kind,
-            "mimetype": mimetype or "",
-            "text": None
-        }
+        item = { "name": fname, "url": url, "kind": kind, "mimetype": mimetype or "", "text": None }
 
         if kind == "text":
+            # Muat seluruh file teks untuk diedit, dengan batas aman
             with open(fpath, "rb") as f:
-                chunk = f.read(MAX_TEXT_PREVIEW_BYTES)
+                chunk = f.read(MAX_EDITABLE_TEXT_BYTES)
             try:
                 item["text"] = chunk.decode("utf-8", errors="replace")
             except Exception:
@@ -131,6 +127,36 @@ def edit_session(session_name):
         files_meta.append(item)
 
     return render_template('session.html', session_name=safe_name, files=files_meta)
+    
+# --- RUTE BARU UNTUK MENYIMPAN FILE ---
+@app.route('/session/<session_name>/save/<path:filename>', methods=['POST'])
+def save_text_file(session_name, filename):
+    safe_name = safe_session_name(session_name)
+    safe_filename = secure_filename(filename)
+
+    if not safe_name or not safe_filename:
+        return abort(400) # Bad Request
+
+    session_dir = os.path.join(BASE_DIR, safe_name)
+    file_path = os.path.join(session_dir, safe_filename)
+
+    if not os.path.exists(file_path):
+        return abort(404) # Not Found
+
+    # Ambil konten baru dari form
+    new_content = request.form.get('content', '')
+
+    # Tulis konten baru ke file
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+    except Exception as e:
+        # Sebaiknya ada logging di sini
+        return "Gagal menyimpan file.", 500
+
+    # Redirect kembali ke halaman sesi
+    return redirect(url_for('edit_session', session_name=safe_name))
+
 
 @app.route('/session/<session_name>/upload', methods=['POST'])
 def upload_to_session(session_name):

@@ -65,3 +65,24 @@ body {
     max-height: 400px;
     overflow-y: auto;
 }
+
+
+
+/* ... (kode CSS yang sudah ada di atas) ... */
+
+/* Style untuk tombol-tombol di bawah textarea */
+.editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; /* Memberi jarak antar tombol */
+}
+
+/* Membuat tombol ikon terlihat lebih baik */
+.btn-icon-only {
+    width: 38px; /* Menyamakan lebar dan tinggi */
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}

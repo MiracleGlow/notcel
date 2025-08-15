@@ -44,8 +44,24 @@
               <video controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></video>
             {% elif f.kind == 'audio' %}
               <audio controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></audio>
+            
+            <!-- PERUBAHAN UTAMA DI SINI -->
             {% elif f.kind == 'text' %}
-              <pre class="mb-0"><code>{{ f.text }}</code></pre>
+              {% set textarea_id = "textarea-" + loop.index|string %}
+              <form method="POST" action="{{ url_for('save_text_file', session_name=session_name, filename=f.name) }}">
+                <div class="mb-2">
+                    <textarea name="content" id="{{ textarea_id }}" class="form-control" rows="15">{{ f.text }}</textarea>
+                </div>
+                <div class="editor-actions">
+                    <button type="submit" class="btn btn-sm btn-success btn-icon-only" title="Simpan Perubahan">
+                        <i class="bi bi-save"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon-only js-copy-btn" title="Salin ke Clipboard" data-target-id="{{ textarea_id }}">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+              </form>
+            
             {% else %}
               <p class="text-muted mb-0 fst-italic">Pratinjau tidak tersedia untuk format file ini.</p>
             {% endif %}
@@ -60,4 +76,38 @@
     </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const copyButtons = document.querySelectorAll('.js-copy-btn');
+
+    copyButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
+            const targetId = event.currentTarget.dataset.targetId;
+            const textarea = document.getElementById(targetId);
+            
+            if (textarea && navigator.clipboard) {
+                navigator.clipboard.writeText(textarea.value).then(() => {
+                    // Beri feedback visual ke pengguna
+                    const originalIcon = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check-lg"></i>';
+                    button.classList.add('btn-success');
+                    button.classList.remove('btn-outline-secondary');
+
+                    // Kembalikan ke ikon semula setelah 2 detik
+                    setTimeout(() => {
+                        button.innerHTML = originalIcon;
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-secondary');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Gagal menyalin teks: ', err);
+                });
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
