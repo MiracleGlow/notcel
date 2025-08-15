@@ -5,21 +5,19 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+# Konfigurasi
 BASE_DIR = "/tmp/notes"
 os.makedirs(BASE_DIR, exist_ok=True)
+SESSIONS_PER_PAGE = 10 # Jumlah sesi yang ditampilkan per halaman
 
+# Set ekstensi file
 IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
 VIDEO_EXT = {"mp4", "webm", "ogg", "mov"}
 AUDIO_EXT = {"mp3", "wav", "ogg", "m4a"}
 TEXT_EXT  = {"txt", "md", "log", "py", "json", "csv", "ini"}
-
-MAX_TEXT_PREVIEW_BYTES = 128 * 1024  # 128 KB agar aman di template
+MAX_TEXT_PREVIEW_BYTES = 128 * 1024  # 128 KB
 
 def safe_session_name(name: str) -> str:
-    """
-    Amankan nama sesi agar jadi nama folder yang valid & tidak kosong.
-    secure_filename mengubah spasi jadi underscore, hapus karakter berbahaya.
-    """
     cleaned = secure_filename(name).strip("._")
     return cleaned
 
@@ -36,7 +34,34 @@ def classify_file(filename: str):
 
 @app.route('/')
 def index():
-    return render_template('index.html', sessions=get_sessions())
+    search_query = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+
+    all_sessions = get_sessions()
+    
+    if search_query:
+        filtered_sessions = [s for s in all_sessions if search_query.lower() in s.lower()]
+    else:
+        filtered_sessions = all_sessions
+
+    total_sessions = len(filtered_sessions)
+    total_pages = (total_sessions + SESSIONS_PER_PAGE - 1) // SESSIONS_PER_PAGE
+    
+    if page < 1: page = 1
+    if page > total_pages and total_pages > 0: page = total_pages
+        
+    start_index = (page - 1) * SESSIONS_PER_PAGE
+    end_index = start_index + SESSIONS_PER_PAGE
+    
+    paginated_sessions = filtered_sessions[start_index:end_index]
+
+    return render_template(
+        'index.html', 
+        sessions=paginated_sessions,
+        current_page=page,
+        total_pages=total_pages,
+        search_query=search_query
+    )
 
 @app.route('/new', methods=['GET', 'POST'])
 def new_session():
@@ -53,7 +78,6 @@ def new_session():
 
         if mode == 'manual':
             content = (request.form.get('content') or "")
-            # Simpan ke notes.txt (UTF-8)
             with open(os.path.join(session_dir, "notes.txt"), "w", encoding="utf-8") as f:
                 f.write(content)
 
@@ -69,7 +93,7 @@ def new_session():
 
     return render_template('new_session.html')
 
-@app.route('/session/<session_name>', methods=['GET', 'POST'])
+@app.route('/session/<session_name>')
 def edit_session(session_name):
     safe_name = safe_session_name(session_name)
     if not safe_name:
@@ -79,7 +103,6 @@ def edit_session(session_name):
     if not os.path.exists(session_dir):
         return "Sesi tidak ditemukan!", 404
 
-    # Daftar & siapkan metadata file untuk template
     files_meta = []
     for fname in sorted(os.listdir(session_dir)):
         fpath = os.path.join(session_dir, fname)
@@ -99,7 +122,6 @@ def edit_session(session_name):
         }
 
         if kind == "text":
-            # Baca sebagian saja untuk preview agar aman
             with open(fpath, "rb") as f:
                 chunk = f.read(MAX_TEXT_PREVIEW_BYTES)
             try:

@@ -46,13 +46,11 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
-/* Sedikit penyesuaian pada list group */
 .list-group-item:hover {
     background-color: var(--hover-bg);
     transition: background-color 0.2s ease-in-out;
 }
 
-/* Style preview file yang lebih baik */
 .file-preview-wrapper img,
 .file-preview-wrapper video,
 .file-preview-wrapper audio {

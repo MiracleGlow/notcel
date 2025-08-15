@@ -6,15 +6,25 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0">Daftar Sesi</h1>
     <a href="{{ url_for('new_session') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i> Tambah Sesi
+        <i class="bi bi-plus-lg me-1"></i> 
+        <span class="d-none d-sm-inline">Tambah Sesi</span>
     </a>
 </div>
+
+<form method="GET" action="{{ url_for('index') }}" class="mb-4">
+    <div class="input-group">
+        <input type="search" name="q" class="form-control" placeholder="Cari nama sesi..." value="{{ search_query or '' }}">
+        <button class="btn btn-outline-secondary" type="submit">
+            <i class="bi bi-search"></i>
+        </button>
+    </div>
+</form>
 
 {% if sessions %}
     <ul class="list-group">
     {% for s in sessions %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span class="fw-bold">{{ s }}</span>
+            <span class="fw-bold text-break">{{ s }}</span>
             <a href="{{ url_for('edit_session', session_name=s) }}" class="btn btn-sm btn-outline-secondary">
                 Buka <i class="bi bi-box-arrow-in-right ms-1"></i>
             </a>
@@ -23,8 +33,38 @@
     </ul>
 {% else %}
     <div class="text-center p-5 border rounded">
-        <p class="text-muted fs-5">Belum ada Sesi yang dibuat.</p>
-        <p>Mulai dengan membuat sesi baru.</p>
+        {% if search_query %}
+            <p class="text-muted fs-5">Tidak ditemukan sesi yang cocok dengan <br>"<strong>{{ search_query }}</strong>"</p>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-secondary mt-2">Tampilkan Semua Sesi</a>
+        {% else %}
+            <p class="text-muted fs-5">Belum ada Sesi yang dibuat.</p>
+            <p>Mulai dengan membuat sesi baru.</p>
+        {% endif %}
     </div>
 {% endif %}
+
+{% if total_pages > 1 %}
+<nav aria-label="Navigasi Halaman Sesi" class="mt-4 d-flex justify-content-center">
+    <ul class="pagination">
+        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('index', page=current_page-1, q=search_query) }}">
+                &laquo;
+            </a>
+        </li>
+        
+        {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == current_page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('index', page=p, q=search_query) }}">{{ p }}</a>
+            </li>
+        {% endfor %}
+        
+        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('index', page=current_page+1, q=search_query) }}">
+                &raquo;
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}
