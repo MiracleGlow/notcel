@@ -86,3 +86,27 @@ body {
     align-items: center;
     justify-content: center;
 }
+
+/* ... (kode CSS yang sudah ada di atas) ... */
+
+/* Style untuk pemisah di dalam modal */
+.modal-separator {
+    text-align: center;
+    color: #6c757d;
+    margin: 1.5rem 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.modal-separator::before,
+.modal-separator::after {
+    content: '';
+    flex-grow: 1;
+    height: 1px;
+    background-color: #dee2e6;
+}
+
+.modal-separator span {
+    padding: 0 1rem;
+}
