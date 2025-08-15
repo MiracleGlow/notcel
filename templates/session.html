@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Sesi: {{ session_name }} - SesiPad{% endblock %}
+{% block title %}Sesi: {{ session_name }} - Nocel{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -8,14 +8,17 @@
         <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary me-3">
             <i class="bi bi-arrow-left"></i>
         </a>
-        <h1 class="h3 mb-0 text-break">Sesi: <span class="fw-bold">{{ session_name }}</span></h1>
+        <h1 class="h3 mb-0 text-break">
+            Sesi {{ 'Private' if session_type == 'private' else 'Publik' }}: 
+            <span class="fw-bold">{{ session_name }}</span>
+        </h1>
     </div>
 </div>
 
 <div class="card mb-4">
     <div class="card-body">
         <h5 class="card-title">Tambah File ke Sesi</h5>
-        <form method="POST" action="{{ url_for('upload_to_session', session_name=session_name) }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}" enctype="multipart/form-data">
             <div class="input-group">
                 <input type="file" class="form-control" name="file" required>
                 <button class="btn btn-primary" type="submit">
@@ -45,10 +48,9 @@
             {% elif f.kind == 'audio' %}
               <audio controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></audio>
             
-            <!-- PERUBAHAN UTAMA DI SINI -->
             {% elif f.kind == 'text' %}
               {% set textarea_id = "textarea-" + loop.index|string %}
-              <form method="POST" action="{{ url_for('save_text_file', session_name=session_name, filename=f.name) }}">
+              <form method="POST" action="{{ url_for('save_text_file', session_type=session_type, session_name=session_name, filename=f.name) }}">
                 <div class="mb-2">
                     <textarea name="content" id="{{ textarea_id }}" class="form-control" rows="15">{{ f.text }}</textarea>
                 </div>
@@ -75,35 +77,27 @@
         <p>Gunakan form di atas untuk mulai mengunggah.</p>
     </div>
 {% endif %}
-
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const copyButtons = document.querySelectorAll('.js-copy-btn');
-
     copyButtons.forEach(button => {
         button.addEventListener('click', (event) => {
             const targetId = event.currentTarget.dataset.targetId;
             const textarea = document.getElementById(targetId);
-            
             if (textarea && navigator.clipboard) {
                 navigator.clipboard.writeText(textarea.value).then(() => {
-                    // Beri feedback visual ke pengguna
                     const originalIcon = button.innerHTML;
                     button.innerHTML = '<i class="bi bi-check-lg"></i>';
                     button.classList.add('btn-success');
                     button.classList.remove('btn-outline-secondary');
-
-                    // Kembalikan ke ikon semula setelah 2 detik
                     setTimeout(() => {
                         button.innerHTML = originalIcon;
                         button.classList.remove('btn-success');
                         button.classList.add('btn-outline-secondary');
                     }, 2000);
-                }).catch(err => {
-                    console.error('Gagal menyalin teks: ', err);
                 });
             }
         });

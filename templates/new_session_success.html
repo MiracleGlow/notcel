@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block title %}Sesi Private Berhasil Dibuat!{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="h3 mb-3">Sesi Private Berhasil Dibuat!</h1>
+    <p class="lead">Simpan kode akses ini baik-baik. Ini adalah satu-satunya cara untuk mengakses sesi private Anda.</p>
+
+    <div class="card my-4 mx-auto" style="max-width: 500px;">
+        <div class="card-body">
+            <h5 class="card-title">Kode Akses Private Anda:</h5>
+            <div class="input-group my-3">
+                <input type="text" id="privateCodeInput" class="form-control form-control-lg text-center fs-4" value="{{ code }}" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="copyCodeBtn" title="Salin ke Clipboard">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+            <a href="{{ url_for('edit_session', session_type='private', session_name=session_name) }}" class="btn btn-primary w-100">
+                Lanjutkan ke Sesi <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+    </div>
+    
+    <a href="{{ url_for('index') }}">Kembali ke Halaman Utama</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const copyButton = document.getElementById('copyCodeBtn');
+    const codeInput = document.getElementById('privateCodeInput');
+
+    if (copyButton && codeInput && navigator.clipboard) {
+        copyButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(codeInput.value).then(() => {
+                const originalIcon = copyButton.innerHTML;
+                copyButton.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
+                setTimeout(() => { copyButton.innerHTML = originalIcon; }, 2000);
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
