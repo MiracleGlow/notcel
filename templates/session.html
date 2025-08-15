@@ -1,48 +1,59 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sesi: {{ session_name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sesi: {{ session_name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="container mt-5">
-    <h1 class="mb-4">Sesi: {{ session_name }}</h1>
+  <h1 class="mb-4">Sesi: {{ session_name }}</h1>
 
-    <form method="POST" action="{{ url_for('upload_to_session', session_name=session_name) }}" enctype="multipart/form-data" class="mb-4">
-        <div class="input-group">
-            <input type="file" class="form-control" name="file" required>
-            <button class="btn btn-primary">Upload</button>
+  <!-- Upload file tambahan ke sesi ini -->
+  <form method="POST" action="{{ url_for('upload_to_session', session_name=session_name) }}" enctype="multipart/form-data" class="mb-4">
+    <div class="input-group">
+      <input type="file" class="form-control" name="file" required>
+      <button class="btn btn-primary">Upload</button>
+    </div>
+  </form>
+
+  {% if files %}
+    <div class="list-group">
+      {% for f in files %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>{{ f.name }}</strong>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ f.url }}" download>Download</a>
+          </div>
+
+          {% if f.kind == 'image' %}
+            <img src="{{ f.url }}" class="img-fluid" alt="{{ f.name }}">
+
+          {% elif f.kind == 'video' %}
+            <video controls class="w-100">
+              <source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}>
+              Browser Anda tidak mendukung video tag.
+            </video>
+
+          {% elif f.kind == 'audio' %}
+            <audio controls class="w-100">
+              <source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}>
+              Browser Anda tidak mendukung audio tag.
+            </audio>
+
+          {% elif f.kind == 'text' %}
+            <pre class="mb-0" style="white-space: pre-wrap">{{ f.text }}</pre>
+
+          {% else %}
+            <p class="text-muted mb-0">Format tidak dapat dipratinjau. Gunakan tombol Download.</p>
+          {% endif %}
         </div>
-    </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>Belum ada file dalam sesi ini.</p>
+  {% endif %}
 
-    {% if files %}
-        <div class="list-group">
-        {% for f in files %}
-            {% set ext = f.split('.')[-1].lower() %}
-            <div class="list-group-item">
-                {% if ext in ['png','jpg','jpeg','gif','webp'] %}
-                    <img src="{{ url_for('serve_file', session_name=session_name, filename=f) }}" class="img-fluid" alt="{{ f }}">
-                {% elif ext in ['mp4','webm','ogg'] %}
-                    <video controls class="w-100">
-                        <source src="{{ url_for('serve_file', session_name=session_name, filename=f) }}">
-                    </video>
-                {% elif ext in ['mp3','wav','ogg'] %}
-                    <audio controls class="w-100">
-                        <source src="{{ url_for('serve_file', session_name=session_name, filename=f) }}">
-                    </audio>
-                {% elif ext == 'txt' %}
-                    <pre>{{ open(BASE_DIR + '/' + session_name + '/' + f).read() }}</pre>
-                {% else %}
-                    <a href="{{ url_for('serve_file', session_name=session_name, filename=f) }}" download>{{ f }}</a>
-                {% endif %}
-            </div>
-        {% endfor %}
-        </div>
-    {% else %}
-        <p>Belum ada file dalam sesi ini.</p>
-    {% endif %}
-
-    <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Kembali</a>
+  <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Kembali</a>
 </body>
 </html>
