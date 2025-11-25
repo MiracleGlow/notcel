@@ -1,10 +1,11 @@
 {
-  "name": "Nocel App",
+  "name": "Notes Vercel",
   "short_name": "Nocel",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#0084ff",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
