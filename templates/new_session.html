@@ -1,68 +1,77 @@
 {% extends "layout.html" %}
 
-{% block title %}
-    Buat Sesi {{ 'Private' if session_type == 'private' else 'Publik' }} - Nocel
-{% endblock %}
+{% block title %}Buat Sesi - Nocel{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center mb-4">
-    <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary me-3">
+    <a href="{{ url_for('index') }}" class="btn btn-light rounded-circle btn-icon-only me-3 shadow-sm">
         <i class="bi bi-arrow-left"></i>
     </a>
-    <h1 class="h3 mb-0">
-        Buat Sesi {{ 'Private' if session_type == 'private' else 'Publik' }} Baru
+    <h1 class="h4 mb-0 fw-bold">
+        Buat {{ 'Private' if session_type == 'private' else 'Publik' }}
     </h1>
 </div>
 
 {% if session_type == 'private' %}
-<div class="alert alert-warning">
-    <i class="bi bi-info-circle-fill me-2"></i>
-    Sesi private tidak akan ditampilkan di halaman utama. Anda akan diberi kode unik untuk mengaksesnya setelah sesi dibuat.
+<div class="alert alert-warning border-0 bg-warning bg-opacity-10 d-flex align-items-start rounded-3 mb-4">
+    <i class="bi bi-shield-exclamation text-warning fs-5 me-2 mt-1"></i>
+    <div class="small text-dark">
+        <strong>Info Private:</strong> Sesi ini tersembunyi. Anda akan mendapatkan <b>Kode Akses</b> setelah dibuat. Jangan sampai hilang!
+    </div>
 </div>
 {% endif %}
 
-<ul class="nav nav-tabs" id="newSessionTab" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">Tulis Catatan</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">Upload File</button>
-    </li>
-</ul>
-
-<div class="tab-content p-3 pt-4 border border-top-0 rounded-bottom">
-    <div class="tab-pane fade show active" id="manual" role="tabpanel">
-      <form method="POST">
-        <input type="hidden" name="mode" value="manual">
-        <div class="mb-3">
-          <label for="sessionNameManual" class="form-label">Nama Sesi</label>
-          <input type="text" class="form-control" id="sessionNameManual" name="session_name" required>
-        </div>
-        <div class="mb-3">
-          <label for="contentManual" class="form-label">Catatan Awal (Opsional)</label>
-          <textarea class="form-control" id="contentManual" name="content" rows="8" placeholder="Tulis catatan di sini..."></textarea>
-        </div>
-        <button type="submit" class="btn btn-success">
-          <i class="bi bi-plus-circle me-1"></i>Buat Sesi
-        </button>
-      </form>
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom-0 pt-3 px-3">
+        <ul class="nav nav-pills nav-fill" id="newSessionTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-medium" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button">Tulis</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-medium" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button">Upload</button>
+            </li>
+        </ul>
     </div>
-    <div class="tab-pane fade" id="upload" role="tabpanel">
-      <form method="POST" enctype="multipart/form-data">
-        <input type="hidden" name="mode" value="upload">
-        <div class="mb-3">
-          <label for="sessionNameUpload" class="form-label">Nama Sesi</label>
-          <input type="text" class="form-control" id="sessionNameUpload" name="session_name" required>
+    
+    <div class="card-body p-4">
+        <div class="tab-content">
+            <!-- TAB MANUAL -->
+            <div class="tab-pane fade show active" id="manual">
+              <form method="POST">
+                <input type="hidden" name="mode" value="manual">
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="sessionNameManual" name="session_name" placeholder="Nama Sesi" required>
+                  <label for="sessionNameManual">Nama Sesi</label>
+                </div>
+                <div class="form-floating mb-4">
+                  <textarea class="form-control" id="contentManual" name="content" placeholder="Catatan" style="height: 150px"></textarea>
+                  <label for="contentManual">Catatan Awal (Opsional)</label>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">
+                  <i class="bi bi-check-lg me-1"></i> Buat Sesi
+                </button>
+              </form>
+            </div>
+            
+            <!-- TAB UPLOAD -->
+            <div class="tab-pane fade" id="upload">
+              <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="mode" value="upload">
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="sessionNameUpload" name="session_name" placeholder="Nama Sesi" required>
+                  <label for="sessionNameUpload">Nama Sesi</label>
+                </div>
+                <div class="mb-4">
+                  <label for="fileUpload" class="form-label small text-muted ms-1">Pilih File</label>
+                  <input type="file" class="form-control form-control-lg" id="fileUpload" name="file" required>
+                  <div class="form-text text-end">Max 4MB</div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">
+                  <i class="bi bi-cloud-upload me-1"></i> Upload & Buat
+                </button>
+              </form>
+            </div>
         </div>
-        <div class="mb-3">
-          <label for="fileUpload" class="form-label">Pilih File</label>
-          <input type="file" class="form-control" id="fileUpload" name="file" required>
-          <div class="form-text">Ukuran file maksimal yang disarankan adalah 4 MB.</div>
-        </div>
-        <button type="submit" class="btn btn-success">
-          <i class="bi bi-upload me-1"></i>Upload & Buat Sesi
-        </button>
-      </form>
     </div>
 </div>
 {% endblock %}

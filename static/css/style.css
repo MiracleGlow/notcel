@@ -1,112 +1,130 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-
 :root {
-    --app-bg: #f8f9fa;
-    --content-bg: #ffffff;
-    --border-color: #dee2e6;
-    --text-color: #212529;
+    --bs-body-font-family: 'Inter', sans-serif;
     --primary-color: #0d6efd;
-    --hover-bg: #f1f3f5;
+    --bg-light: #f8f9fa;
+    --card-radius: 12px;
+    --btn-radius: 8px;
+    --transition-speed: 0.2s;
 }
 
 body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--app-bg);
-    color: var(--text-color);
+    -webkit-font-smoothing: antialiased;
 }
 
-.app-header {
-    background-color: var(--content-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1rem 0;
-    margin-bottom: 2rem;
+/* Container Logic: Mobile Full Width, Desktop Boxed */
+.app-container {
+    width: 100%;
+    padding-right: var(--bs-gutter-x, .75rem);
+    padding-left: var(--bs-gutter-x, .75rem);
+    margin-right: auto;
+    margin-left: auto;
 }
 
-.app-header .navbar-brand {
-    font-weight: 700;
-    font-size: 1.5rem;
+@media (min-width: 768px) {
+    .app-container {
+        max-width: 800px;
+        background-color: #ffffff;
+        border: 1px solid #e9ecef;
+        border-radius: var(--card-radius);
+        padding: 2.5rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+    }
 }
 
-.app-main-content {
-    background-color: var(--content-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    padding: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    max-width: 960px; /* Lebar maksimal konten agar nyaman dibaca */
-    margin: 0 auto;
+@media (max-width: 767.98px) {
+    .app-container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+    .card {
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
 }
 
-.app-footer {
-    text-align: center;
-    margin-top: 3rem;
-    padding: 1.5rem 0;
-    color: #6c757d;
-    font-size: 0.9rem;
-    border-top: 1px solid var(--border-color);
+/* Elements Styling */
+.card {
+    border-radius: var(--card-radius);
+    border: 1px solid rgba(0,0,0,0.08);
 }
 
-.list-group-item:hover {
-    background-color: var(--hover-bg);
-    transition: background-color 0.2s ease-in-out;
+.btn {
+    border-radius: var(--btn-radius);
+    font-weight: 500;
+    padding: 0.6rem 1.2rem;
 }
 
-.file-preview-wrapper img,
-.file-preview-wrapper video,
-.file-preview-wrapper audio {
-    border-radius: 0.375rem;
-    border: 1px solid var(--border-color);
+.form-control, .form-select {
+    border-radius: var(--btn-radius);
+    padding: 0.7rem 1rem;
+    border-color: #dee2e6;
 }
 
-.file-preview-wrapper pre {
-    background-color: #f1f3f5;
-    padding: 1rem;
-    border-radius: 0.375rem;
-    max-height: 400px;
-    overflow-y: auto;
+.form-control:focus {
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1);
+    border-color: var(--primary-color);
 }
 
-
-
-/* ... (kode CSS yang sudah ada di atas) ... */
-
-/* Style untuk tombol-tombol di bawah textarea */
-.editor-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem; /* Memberi jarak antar tombol */
-}
-
-/* Membuat tombol ikon terlihat lebih baik */
+/* Custom Utilities */
 .btn-icon-only {
-    width: 38px; /* Menyamakan lebar dan tinggi */
-    height: 38px;
+    width: 42px;
+    height: 42px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-/* ... (kode CSS yang sudah ada di atas) ... */
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 1rem;
+}
+.list-group-item:last-child { border-bottom: none; }
 
-/* Style untuk pemisah di dalam modal */
+/* File Previews */
+.file-preview-wrapper {
+    background: #f8f9fa;
+    border-radius: var(--btn-radius);
+    padding: 0.5rem;
+    margin-top: 1rem;
+}
+
+.file-preview-wrapper img,
+.file-preview-wrapper video {
+    border-radius: 6px;
+    max-height: 400px;
+    object-fit: contain;
+    width: 100%;
+}
+
+textarea.code-editor {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    background-color: #fdfdfd;
+}
+
+/* Modal Polish */
+.modal-content {
+    border-radius: 16px;
+    border: none;
+}
+.modal-header { border-bottom: 1px solid #f0f0f0; }
 .modal-separator {
-    text-align: center;
-    color: #6c757d;
-    margin: 1.5rem 0;
-    position: relative;
     display: flex;
     align-items: center;
+    text-align: center;
+    color: #adb5bd;
+    margin: 1.5rem 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
-
-.modal-separator::before,
-.modal-separator::after {
+.modal-separator::before, .modal-separator::after {
     content: '';
-    flex-grow: 1;
-    height: 1px;
-    background-color: #dee2e6;
+    flex: 1;
+    border-bottom: 1px solid #dee2e6;
 }
-
-.modal-separator span {
-    padding: 0 1rem;
-}
+.modal-separator span { padding: 0 10px; }

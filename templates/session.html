@@ -1,80 +1,104 @@
 {% extends "layout.html" %}
 
-{% block title %}Sesi: {{ session_name }} - Nocel{% endblock %}
+{% block title %}{{ session_name }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center">
-        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <a href="{{ url_for('index') }}" class="btn btn-light rounded-circle btn-icon-only me-3 shadow-sm">
             <i class="bi bi-arrow-left"></i>
         </a>
-        <h1 class="h3 mb-0 text-break">
-            Sesi {{ 'Private' if session_type == 'private' else 'Publik' }}: 
-            <span class="fw-bold">{{ session_name }}</span>
-        </h1>
+        <div class="lh-1">
+            <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Sesi {{ 'Private' if session_type == 'private' else 'Publik' }}</div>
+            <h1 class="h5 fw-bold mb-0 text-break">{{ session_name }}</h1>
+        </div>
     </div>
+    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse">
+        <i class="bi bi-plus-lg"></i> File
+    </button>
 </div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="card-title">Tambah File ke Sesi</h5>
+<!-- Upload Collapse Area -->
+<div class="collapse mb-4" id="uploadCollapse">
+    <div class="card card-body bg-light border-0 shadow-sm">
         <form method="POST" action="{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}" enctype="multipart/form-data">
+            <label class="form-label fw-bold small">Tambah File Baru</label>
             <div class="input-group">
-                <input type="file" class="form-control" name="file" required>
-                <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-upload me-1"></i> Upload
-                </button>
+                <input type="file" class="form-control bg-white" name="file" required>
+                <button class="btn btn-primary" type="submit">Upload</button>
             </div>
-            <div class="form-text mt-2">Ukuran file maksimal yang disarankan adalah 4 MB.</div>
         </form>
     </div>
 </div>
 
 {% if files %}
-  <div class="list-group">
+  <div class="d-flex flex-column gap-3">
     {% for f in files %}
-      <div class="list-group-item p-3">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <strong class="text-break">{{ f.name }}</strong>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ f.url }}" download>
-            <i class="bi bi-download me-1"></i> Download
-          </a>
+      <div class="card shadow-sm overflow-hidden">
+        <!-- File Header -->
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <div class="d-flex align-items-center overflow-hidden">
+                <i class="bi 
+                    {% if f.kind == 'image' %}bi-file-image text-success
+                    {% elif f.kind == 'video' %}bi-file-play text-danger
+                    {% elif f.kind == 'text' %}bi-file-text text-primary
+                    {% else %}bi-file-earmark text-secondary{% endif %} 
+                    me-2 fs-5"></i>
+                <strong class="text-truncate" style="max-width: 200px;">{{ f.name }}</strong>
+            </div>
+            <a href="{{ f.url }}" download class="btn btn-light btn-sm rounded-circle btn-icon-only border">
+                <i class="bi bi-download"></i>
+            </a>
         </div>
-        <div class="file-preview-wrapper">
+
+        <!-- File Content -->
+        <div class="card-body p-0">
             {% if f.kind == 'image' %}
-              <img src="{{ f.url }}" class="img-fluid" alt="{{ f.name }}">
+                <div class="bg-light text-center p-2">
+                    <img src="{{ f.url }}" class="img-fluid rounded shadow-sm" style="max-height: 300px;" alt="{{ f.name }}">
+                </div>
             {% elif f.kind == 'video' %}
-              <video controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></video>
+                <div class="bg-dark text-center">
+                    <video controls class="w-100" style="max-height: 400px;"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></video>
+                </div>
             {% elif f.kind == 'audio' %}
-              <audio controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></audio>
+                <div class="p-3 bg-light d-flex justify-content-center">
+                    <audio controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></audio>
+                </div>
             
             {% elif f.kind == 'text' %}
               {% set textarea_id = "textarea-" + loop.index|string %}
-              <form method="POST" action="{{ url_for('save_text_file', session_type=session_type, session_name=session_name, filename=f.name) }}">
-                <div class="mb-2">
-                    <textarea name="content" id="{{ textarea_id }}" class="form-control" rows="15">{{ f.text }}</textarea>
-                </div>
-                <div class="editor-actions">
-                    <button type="submit" class="btn btn-sm btn-success btn-icon-only" title="Simpan Perubahan">
-                        <i class="bi bi-save"></i>
+              <form method="POST" action="{{ url_for('save_text_file', session_type=session_type, session_name=session_name, filename=f.name) }}" class="position-relative">
+                <textarea name="content" id="{{ textarea_id }}" class="form-control code-editor border-0 rounded-0 p-3" rows="12">{{ f.text }}</textarea>
+                
+                <!-- Floating Actions Toolbar -->
+                <div class="d-flex justify-content-end gap-2 p-2 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary js-copy-btn d-flex align-items-center" data-target-id="{{ textarea_id }}">
+                        <i class="bi bi-clipboard me-1"></i> Salin
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon-only js-copy-btn" title="Salin ke Clipboard" data-target-id="{{ textarea_id }}">
-                        <i class="bi bi-clipboard"></i>
+                    <button type="submit" class="btn btn-sm btn-success px-3 d-flex align-items-center">
+                        <i class="bi bi-save me-1"></i> Simpan
                     </button>
                 </div>
               </form>
             
             {% else %}
-              <p class="text-muted mb-0 fst-italic">Pratinjau tidak tersedia untuk format file ini.</p>
+              <div class="p-4 text-center text-muted bg-light">
+                  <i class="bi bi-eye-slash fs-4 d-block mb-2"></i>
+                  <small>Pratinjau tidak tersedia</small>
+              </div>
             {% endif %}
         </div>
       </div>
     {% endfor %}
   </div>
 {% else %}
-    <div class="text-center p-5 border rounded">
-        <p class="text-muted fs-5">Belum ada file di sesi ini.</p>
-        <p>Gunakan form di atas untuk mulai mengunggah.</p>
+    <div class="text-center py-5 border-2 border-dashed rounded-3 bg-light">
+        <i class="bi bi-folder2-open display-4 text-muted mb-3"></i>
+        <p class="text-muted mb-0">Sesi ini masih kosong.</p>
+        <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse">
+            Tambah file sekarang
+        </button>
     </div>
 {% endif %}
 {% endblock %}
@@ -82,21 +106,19 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const copyButtons = document.querySelectorAll('.js-copy-btn');
-    copyButtons.forEach(button => {
+    // Copy Functionality
+    document.querySelectorAll('.js-copy-btn').forEach(button => {
         button.addEventListener('click', (event) => {
             const targetId = event.currentTarget.dataset.targetId;
             const textarea = document.getElementById(targetId);
             if (textarea && navigator.clipboard) {
                 navigator.clipboard.writeText(textarea.value).then(() => {
-                    const originalIcon = button.innerHTML;
-                    button.innerHTML = '<i class="bi bi-check-lg"></i>';
-                    button.classList.add('btn-success');
-                    button.classList.remove('btn-outline-secondary');
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check-lg me-1"></i> Disalin!';
+                    button.classList.replace('btn-outline-secondary', 'btn-success');
                     setTimeout(() => {
-                        button.innerHTML = originalIcon;
-                        button.classList.remove('btn-success');
-                        button.classList.add('btn-outline-secondary');
+                        button.innerHTML = originalHTML;
+                        button.classList.replace('btn-success', 'btn-outline-secondary');
                     }, 2000);
                 });
             }

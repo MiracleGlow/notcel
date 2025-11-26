@@ -1,58 +1,64 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-100">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}Sesi Notepad{% endblock %}</title>
-    <meta name="theme-color" content="#0d6efd">
+    <meta name="theme-color" content="#ffffff">
+    
+    <!-- Bootstrap 5.3 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- PWA Icons -->
     <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-512.png') }}">
-
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
 
-    <header class="app-header">
-        <nav class="container d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('index') }}" class="navbar-brand text-decoration-none d-flex align-items-center">
-                <i class="bi bi-journal-richtext me-2"></i>
+    <!-- Navbar Sticky -->
+    <header class="app-header sticky-top bg-white border-bottom shadow-sm">
+        <nav class="container d-flex justify-content-between align-items-center py-2">
+            <a href="{{ url_for('index') }}" class="navbar-brand text-primary d-flex align-items-center fw-bold">
+                <i class="bi bi-journal-bookmark-fill me-2 fs-4"></i>
                 <span>Nocel</span>
             </a>
-            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
-                <i class="bi bi-house-door-fill"></i>
-                <span class="d-none d-sm-inline ms-1">Home</span>
+            <a href="{{ url_for('index') }}" class="btn btn-light rounded-circle btn-icon-only" title="Home">
+                <i class="bi bi-house-door-fill text-dark"></i>
             </a>
         </nav>
     </header>
 
-    <main class="app-main-content container">
-        {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <main class="flex-shrink-0 mb-4">
+        <div class="app-container mt-3 mt-md-5">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
-    <footer class="app-footer">
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-white border-top text-center">
         <div class="container">
-            <p class="mb-0">&copy; 2025 MiracleGlow. Dibuat dengan Flask.</p>
+            <small class="text-muted">&copy; 2025 MiracleGlow. Nocel PWA.</small>
         </div>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () {
-        navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
-            .then(function (reg) {
-                console.log("SW registered.", reg);
-            })
-            .catch(function (err) {
-                console.log("SW registration failed: ", err);
-            });
-    });
-}
-</script>
-
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
+                .then(function (reg) { console.log("SW registered.", reg); })
+                .catch(function (err) { console.log("SW registration failed: ", err); });
+        });
+    }
+    </script>
     
     {% block scripts %}{% endblock %}
 
