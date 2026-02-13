@@ -128,3 +128,6 @@ textarea.code-editor {
     border-bottom: 1px solid #dee2e6;
 }
 .modal-separator span { padding: 0 10px; }
+
+/* Utility */
+.border-dashed { border: 2px dashed #dee2e6 !important; }

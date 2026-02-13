@@ -3,127 +3,223 @@
 {% block title %}{{ session_name }}{% endblock %}
 
 {% block content %}
+<!-- Session Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center">
         <a href="{{ url_for('index') }}" class="btn btn-light rounded-circle btn-icon-only me-3 shadow-sm">
             <i class="bi bi-arrow-left"></i>
         </a>
         <div class="lh-1">
-            <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Sesi {{ 'Private' if session_type == 'private' else 'Publik' }}</div>
+            <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Sesi {{ 'Private' if
+                session_type == 'private' else 'Publik' }}</div>
             <h1 class="h5 fw-bold mb-0 text-break">{{ session_name }}</h1>
         </div>
     </div>
-    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse">
-        <i class="bi bi-plus-lg"></i> File
+</div>
+
+<!-- Action Buttons: Tambah Catatan + Upload File side by side -->
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-sm btn-outline-primary rounded-pill px-3 flex-fill" type="button" data-bs-toggle="collapse"
+        data-bs-target="#addNoteCollapse" aria-expanded="false" onclick="closeOther('uploadCollapse')">
+        <i class="bi bi-pencil-square me-1"></i> Tambah Catatan
+    </button>
+    <button class="btn btn-sm btn-outline-primary rounded-pill px-3 flex-fill" type="button" data-bs-toggle="collapse"
+        data-bs-target="#uploadCollapse" aria-expanded="false" onclick="closeOther('addNoteCollapse')">
+        <i class="bi bi-cloud-upload me-1"></i> Upload File
     </button>
 </div>
 
-<!-- Upload Collapse Area -->
-<div class="collapse mb-4" id="uploadCollapse">
-    <div class="card card-body bg-light border-0 shadow-sm">
-        <form method="POST" action="{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}" enctype="multipart/form-data">
-            <label class="form-label fw-bold small">Tambah File Baru</label>
-            <div class="input-group">
-                <input type="file" class="form-control bg-white" name="file" required>
-                <button class="btn btn-primary" type="submit">Upload</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{% if files %}
-  <div class="d-flex flex-column gap-3">
-    {% for f in files %}
-      <div class="card shadow-sm overflow-hidden">
-        <!-- File Header -->
-        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-            <div class="d-flex align-items-center overflow-hidden">
-                <i class="bi 
-                    {% if f.kind == 'image' %}bi-file-image text-success
-                    {% elif f.kind == 'video' %}bi-file-play text-danger
-                    {% elif f.kind == 'text' %}bi-file-text text-primary
-                    {% else %}bi-file-earmark text-secondary{% endif %} 
-                    me-2 fs-5"></i>
-                <strong class="text-truncate" style="max-width: 200px;">{{ f.name }}</strong>
-            </div>
-            <a href="{{ f.url }}" download class="btn btn-light btn-sm rounded-circle btn-icon-only border">
-                <i class="bi bi-download"></i>
-            </a>
-        </div>
-
-        <!-- File Content -->
-        <div class="card-body p-0">
-            {% if f.kind == 'image' %}
-                <div class="bg-light text-center p-2">
-                    <img src="{{ f.url }}" class="img-fluid rounded shadow-sm" style="max-height: 300px;" alt="{{ f.name }}">
-                </div>
-            {% elif f.kind == 'video' %}
-                <div class="bg-dark text-center">
-                    <video controls class="w-100" style="max-height: 400px;"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></video>
-                </div>
-            {% elif f.kind == 'audio' %}
-                <div class="p-3 bg-light d-flex justify-content-center">
-                    <audio controls class="w-100"><source src="{{ f.url }}" {% if f.mimetype %}type="{{ f.mimetype }}"{% endif %}></audio>
-                </div>
-            
-            {% elif f.kind == 'text' %}
-              {% set textarea_id = "textarea-" + loop.index|string %}
-              <form method="POST" action="{{ url_for('save_text_file', session_type=session_type, session_name=session_name, filename=f.name) }}" class="position-relative">
-                <textarea name="content" id="{{ textarea_id }}" class="form-control code-editor border-0 rounded-0 p-3" rows="12">{{ f.text }}</textarea>
-                
-                <!-- Floating Actions Toolbar -->
-                <div class="d-flex justify-content-end gap-2 p-2 bg-light border-top">
-                    <button type="button" class="btn btn-sm btn-outline-secondary js-copy-btn d-flex align-items-center" data-target-id="{{ textarea_id }}">
-                        <i class="bi bi-clipboard me-1"></i> Salin
-                    </button>
-                    <button type="submit" class="btn btn-sm btn-success px-3 d-flex align-items-center">
+<!-- Add Note Form (Collapsed) -->
+<div class="collapse mb-3" id="addNoteCollapse">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <form method="POST"
+                action="{{ url_for('add_note_route', session_type=session_type, session_name=session_name) }}">
+                <textarea name="content" class="form-control mb-2" rows="3" placeholder="Tulis catatan baru..."
+                    required></textarea>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-sm px-3">
                         <i class="bi bi-save me-1"></i> Simpan
                     </button>
                 </div>
-              </form>
-            
-            {% else %}
-              <div class="p-4 text-center text-muted bg-light">
-                  <i class="bi bi-eye-slash fs-4 d-block mb-2"></i>
-                  <small>Pratinjau tidak tersedia</small>
-              </div>
-            {% endif %}
+            </form>
         </div>
-      </div>
-    {% endfor %}
-  </div>
-{% else %}
-    <div class="text-center py-5 border-2 border-dashed rounded-3 bg-light">
-        <i class="bi bi-folder2-open display-4 text-muted mb-3"></i>
-        <p class="text-muted mb-0">Sesi ini masih kosong.</p>
-        <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse">
-            Tambah file sekarang
-        </button>
     </div>
+</div>
+
+<!-- Upload Form (Collapsed) -->
+<div class="collapse mb-3" id="uploadCollapse">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <form method="POST"
+                action="{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}"
+                enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="file" class="form-control bg-white" name="file" required>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-cloud-upload me-1"></i> Upload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== UNIFIED ITEMS LIST ===================== -->
+{% if items %}
+<div class="d-flex flex-column gap-2">
+    {% for item in items %}
+    {% if item.type == 'note' %}
+    <!-- ===== NOTE CARD ===== -->
+    <div class="card border-0 shadow-sm" id="note-{{ item.id }}">
+        <div class="card-body py-3 px-3">
+            <!-- View Mode -->
+            <div class="note-view" id="note-view-{{ item.id }}">
+                <div class="note-content mb-2" style="white-space: pre-wrap; word-break: break-word;">{{ item.content }}
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ item.created_at }}</small>
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary js-copy-note"
+                            data-note-id="{{ item.id }}" title="Salin">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary js-edit-note"
+                            data-note-id="{{ item.id }}" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="POST"
+                            action="{{ url_for('delete_note_route', session_type=session_type, session_name=session_name, note_id=item.id) }}"
+                            class="d-inline" onsubmit="return confirm('Hapus catatan ini?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <!-- Edit Mode -->
+            <div class="note-edit d-none" id="note-edit-{{ item.id }}">
+                <form method="POST"
+                    action="{{ url_for('edit_note_route', session_type=session_type, session_name=session_name, note_id=item.id) }}">
+                    <textarea name="content" class="form-control mb-2" rows="3">{{ item.content }}</textarea>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary js-cancel-edit"
+                            data-note-id="{{ item.id }}">Batal</button>
+                        <button type="submit" class="btn btn-sm btn-success px-3">
+                            <i class="bi bi-save me-1"></i> Simpan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% elif item.type == 'file' %}
+    <!-- ===== FILE CARD ===== -->
+    <div class="card border-0 shadow-sm overflow-hidden">
+        <!-- File Preview -->
+        {% if item.kind == 'image' %}
+        <div class="bg-light text-center p-2">
+            <img src="{{ item.url }}" class="img-fluid rounded" style="max-height: 250px;" alt="{{ item.name }}">
+        </div>
+        {% elif item.kind == 'video' %}
+        <div class="bg-dark text-center">
+            <video controls class="w-100" style="max-height: 350px;">
+                <source src="{{ item.url }}" {% if item.mimetype %}type="{{ item.mimetype }}" {% endif %}>
+            </video>
+        </div>
+        {% elif item.kind == 'audio' %}
+        <div class="p-3 bg-light d-flex justify-content-center">
+            <audio controls class="w-100">
+                <source src="{{ item.url }}" {% if item.mimetype %}type="{{ item.mimetype }}" {% endif %}>
+            </audio>
+        </div>
+        {% endif %}
+
+        <!-- File Info Bar -->
+        <div class="card-body d-flex justify-content-between align-items-center py-2 px-3">
+            <div class="d-flex align-items-center overflow-hidden">
+                <i class="bi 
+                        {% if item.kind == 'image' %}bi-file-image text-success
+                        {% elif item.kind == 'video' %}bi-file-play text-danger
+                        {% elif item.kind == 'audio' %}bi-file-music text-info
+                        {% else %}bi-file-earmark text-secondary{% endif %} 
+                        me-2 fs-5"></i>
+                <span class="text-truncate small fw-medium" style="max-width: 180px;">{{ item.name }}</span>
+            </div>
+            <div class="d-flex gap-1">
+                <a href="{{ item.url }}" download class="btn btn-sm btn-outline-primary" title="Download">
+                    <i class="bi bi-download"></i>
+                </a>
+                <form method="POST"
+                    action="{{ url_for('delete_file_route', session_type=session_type, session_name=session_name, file_id=item.id) }}"
+                    class="d-inline" onsubmit="return confirm('Hapus file ini?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 bg-light rounded-3 border-dashed">
+    <i class="bi bi-folder2-open display-4 text-muted mb-3"></i>
+    <p class="text-muted mb-0">Sesi ini masih kosong.</p>
+    <p class="text-muted small">Tambahkan catatan atau upload file untuk memulai.</p>
+</div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Copy Functionality
-    document.querySelectorAll('.js-copy-btn').forEach(button => {
-        button.addEventListener('click', (event) => {
-            const targetId = event.currentTarget.dataset.targetId;
-            const textarea = document.getElementById(targetId);
-            if (textarea && navigator.clipboard) {
-                navigator.clipboard.writeText(textarea.value).then(() => {
-                    const originalHTML = button.innerHTML;
-                    button.innerHTML = '<i class="bi bi-check-lg me-1"></i> Disalin!';
-                    button.classList.replace('btn-outline-secondary', 'btn-success');
-                    setTimeout(() => {
-                        button.innerHTML = originalHTML;
-                        button.classList.replace('btn-success', 'btn-outline-secondary');
-                    }, 2000);
-                });
-            }
+    function closeOther(id) {
+        const el = document.getElementById(id);
+        if (el && el.classList.contains('show')) {
+            bootstrap.Collapse.getOrCreateInstance(el).hide();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Copy Note
+        document.querySelectorAll('.js-copy-note').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const noteId = btn.dataset.noteId;
+                const noteEl = document.querySelector(`#note-view-${noteId} .note-content`);
+                if (noteEl && navigator.clipboard) {
+                    navigator.clipboard.writeText(noteEl.textContent.trim()).then(() => {
+                        const icon = btn.querySelector('i');
+                        icon.className = 'bi bi-check-lg';
+                        btn.classList.replace('btn-outline-secondary', 'btn-success');
+                        setTimeout(() => {
+                            icon.className = 'bi bi-clipboard';
+                            btn.classList.replace('btn-success', 'btn-outline-secondary');
+                        }, 1500);
+                    });
+                }
+            });
+        });
+
+        // Edit Note
+        document.querySelectorAll('.js-edit-note').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const noteId = btn.dataset.noteId;
+                document.getElementById(`note-view-${noteId}`).classList.add('d-none');
+                document.getElementById(`note-edit-${noteId}`).classList.remove('d-none');
+            });
+        });
+
+        // Cancel Edit
+        document.querySelectorAll('.js-cancel-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const noteId = btn.dataset.noteId;
+                document.getElementById(`note-view-${noteId}`).classList.remove('d-none');
+                document.getElementById(`note-edit-${noteId}`).classList.add('d-none');
+            });
         });
     });
-});
 </script>
 {% endblock %}

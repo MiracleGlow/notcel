@@ -1,54 +1,73 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory, jsonify
 import os
 import mimetypes
 import random
 import re
+import uuid
 from werkzeug.utils import secure_filename
+from database import (init_db, create_session, get_session, get_public_sessions,
+                      get_session_files, save_file, get_file, get_file_by_id, delete_file_record,
+                      add_note, get_session_notes, get_note, update_note, delete_note)
 
 app = Flask(__name__)
-app.secret_key = 'super-secret-key-change-this' 
+app.secret_key = 'super-secret-key-change-this'
 
 # --- KONFIGURASI ---
-PUBLIC_DIR = "/tmp/notes_public"
-PRIVATE_DIR = "/tmp/notes_private"
-os.makedirs(PUBLIC_DIR, exist_ok=True)
-os.makedirs(PRIVATE_DIR, exist_ok=True)
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+init_db(app)
 
 SESSIONS_PER_PAGE = 10
 IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
 VIDEO_EXT = {"mp4", "webm", "ogg", "mov"}
 AUDIO_EXT = {"mp3", "wav", "ogg", "m4a"}
-TEXT_EXT = {"txt", "md", "log", "py", "json", "csv", "ini", "html", "css", "js"}
-MAX_EDITABLE_TEXT_BYTES = 5 * 1024 * 1024
 
 def safe_session_name(name: str) -> str:
-    # Mengamankan nama folder
     cleaned = secure_filename(name).strip("._")
-    # Jika kosong setelah dibersihkan, beri default
     return cleaned if cleaned else "untitled_session"
-
-def normalize_string(text: str) -> str:
-    # Menghapus semua karakter non-alfanumerik untuk pencarian yang lebih fleksibel
-    # Contoh: "Catatan_Harian" jadi "catatanharian", "My Note!" jadi "mynote"
-    return re.sub(r'[\W_]+', '', text).lower()
-
-def get_public_sessions():
-    try:
-        return sorted([d for d in os.listdir(PUBLIC_DIR) if os.path.isdir(os.path.join(PUBLIC_DIR, d))])
-    except OSError:
-        return []
 
 def classify_file(filename: str):
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext in IMAGE_EXT: return "image"
     if ext in VIDEO_EXT: return "video"
     if ext in AUDIO_EXT: return "audio"
-    if ext in TEXT_EXT:  return "text"
     return "other"
 
-def get_session_dir(session_type: str, session_name: str) -> str:
-    base = PRIVATE_DIR if session_type == 'private' else PUBLIC_DIR
-    return os.path.join(base, session_name)
+def make_unique_filename(original_filename: str) -> str:
+    """Generate a unique filename with UUID suffix."""
+    safe_name = secure_filename(original_filename)
+    ext = ""
+    if "." in original_filename:
+        ext = "." + original_filename.rsplit(".", 1)[-1].lower()
+    if not safe_name or safe_name == ext.lstrip("."):
+        safe_name = "file" + ext
+    if "." in safe_name:
+        base, dot_ext = safe_name.rsplit(".", 1)
+        return f"{base}_{uuid.uuid4().hex[:8]}.{dot_ext}"
+    else:
+        return f"{safe_name}_{uuid.uuid4().hex[:8]}"
+
+def save_uploaded_file(session_id, uploaded_file):
+    """Save an uploaded file to static/uploads/<session_id>/ and record in DB."""
+    original_name = uploaded_file.filename
+    unique_filename = make_unique_filename(original_name)
+    
+    session_upload_dir = os.path.join(UPLOAD_DIR, str(session_id))
+    os.makedirs(session_upload_dir, exist_ok=True)
+    
+    disk_path = os.path.join(session_upload_dir, unique_filename)
+    uploaded_file.save(disk_path)
+    
+    relative_path = f"{session_id}/{unique_filename}"
+    file_mimetype = mimetypes.guess_type(unique_filename)[0] or ""
+    file_kind = classify_file(unique_filename)
+    
+    save_file(session_id, unique_filename,
+             filepath=relative_path,
+             mimetype=file_mimetype,
+             kind=file_kind)
+
 
 # --- ROUTES ---
 
@@ -57,38 +76,20 @@ def index():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
 
-    all_sessions = get_public_sessions()
-    
-    # --- LOGIKA SEARCH DIPERBAIKI ---
-    if search_query:
-        # Normalisasi query user (hapus spasi/simbol)
-        clean_query = normalize_string(search_query)
-        
-        filtered_sessions = []
-        for s in all_sessions:
-            # Normalisasi nama folder (hapus underscore/dash)
-            clean_session_name = normalize_string(s)
-            
-            # Bandingkan versi yang sudah bersih
-            if clean_query in clean_session_name:
-                filtered_sessions.append(s)
-    else:
-        filtered_sessions = all_sessions
+    all_sessions = get_public_sessions(search_query if search_query else None)
 
-    # Pagination Logic
-    total_sessions = len(filtered_sessions)
+    total_sessions = len(all_sessions)
     total_pages = (total_sessions + SESSIONS_PER_PAGE - 1) // SESSIONS_PER_PAGE
-    
+
     if page < 1: page = 1
     if page > total_pages and total_pages > 0: page = total_pages
-        
+
     start_index = (page - 1) * SESSIONS_PER_PAGE
     end_index = start_index + SESSIONS_PER_PAGE
-    
-    paginated_sessions = filtered_sessions[start_index:end_index]
+    paginated_sessions = all_sessions[start_index:end_index]
 
     return render_template(
-        'index.html', 
+        'index.html',
         sessions=paginated_sessions,
         current_page=page,
         total_pages=total_pages,
@@ -103,16 +104,12 @@ def access_private():
 
     session_name_part = code[:-4]
     code_part = code[-4:]
-    
-    safe_name = safe_session_name(session_name_part)
-    session_dir = get_session_dir('private', safe_name)
-    code_file = os.path.join(session_dir, '.pcode')
 
-    if os.path.exists(code_file):
-        with open(code_file, 'r') as f:
-            stored_code = f.read().strip()
-        if stored_code == code_part:
-            return redirect(url_for('edit_session', session_type='private', session_name=safe_name))
+    safe_name = safe_session_name(session_name_part)
+    session = get_session(safe_name, 'private')
+
+    if session and session['private_code'] == code_part:
+        return redirect(url_for('edit_session', session_type='private', session_name=safe_name))
 
     return "Kode privat salah atau sesi tidak ditemukan.", 404
 
@@ -124,33 +121,19 @@ def new_session(session_type):
     if request.method == 'POST':
         raw_session = request.form.get('session_name', '')
         session_name = safe_session_name(raw_session)
-        
-        if not session_name: 
+
+        if not session_name:
             return "Nama sesi tidak valid (gunakan huruf dan angka).", 400
 
-        session_dir = get_session_dir(session_type, session_name)
-        if os.path.exists(session_dir):
-            return "Nama sesi sudah digunakan. Harap pilih nama lain.", 409
-
-        os.makedirs(session_dir, exist_ok=True)
-        
-        mode = request.form.get('mode', 'manual')
-        if mode == 'manual':
-            content = (request.form.get('content') or "")
-            # Simpan default text jika ada
-            if content:
-                with open(os.path.join(session_dir, "notes.txt"), "w", encoding="utf-8") as f:
-                    f.write(content)
-        elif mode == 'upload':
-            file = request.files.get('file')
-            if file and file.filename:
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(session_dir, filename))
-
+        private_code = None
         if session_type == 'private':
             private_code = str(random.randint(1000, 9999))
-            with open(os.path.join(session_dir, '.pcode'), 'w') as f:
-                f.write(private_code)
+
+        session = create_session(session_name, session_type, private_code)
+        if session is None:
+            return "Nama sesi sudah digunakan. Harap pilih nama lain.", 409
+
+        if session_type == 'private':
             full_code = f"{session_name}{private_code}"
             return redirect(url_for('new_session_success', session_name=session_name, code=full_code))
 
@@ -167,84 +150,129 @@ def new_session_success():
 @app.route('/session/<session_type>/<session_name>')
 def edit_session(session_type, session_name):
     if session_type not in ['public', 'private']: return abort(404)
-    
+
     safe_name = safe_session_name(session_name)
-    session_dir = get_session_dir(session_type, safe_name)
-    
-    if not os.path.exists(session_dir): 
-        # Jika user memaksa URL tapi folder tidak ada
-        return abort(404)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
 
-    files_meta = []
-    # List directory dengan error handling sederhana
-    try:
-        dir_content = sorted(os.listdir(session_dir))
-    except OSError:
-        return abort(404)
+    notes = get_session_notes(session['id'])
+    db_files = get_session_files(session['id'])
 
-    for fname in dir_content:
-        if fname.startswith('.'): continue # Skip hidden files like .pcode
-        
-        fpath = os.path.join(session_dir, fname)
-        if not os.path.isfile(fpath): continue
+    # Build unified items list
+    items = []
+    for n in notes:
+        items.append({
+            "type": "note",
+            "id": n['id'],
+            "content": n['content'],
+            "created_at": n['created_at'],
+        })
+    for f in db_files:
+        items.append({
+            "type": "file",
+            "id": f['id'],
+            "name": f['filename'],
+            "url": url_for('serve_file', session_type=session_type, session_name=safe_name, filename=f['filename']),
+            "kind": f['kind'] or classify_file(f['filename']),
+            "mimetype": f['mimetype'] or "",
+            "created_at": f['created_at'],
+        })
 
-        item = {
-            "name": fname,
-            "url": url_for('serve_file', session_type=session_type, session_name=safe_name, filename=fname),
-            "kind": classify_file(fname),
-            "mimetype": mimetypes.guess_type(fname)[0] or "",
-            "text": None
-        }
+    # Sort by creation time (oldest first)
+    items.sort(key=lambda x: x['created_at'])
 
-        if item["kind"] == "text":
-            try:
-                # Batasi baca file teks agar tidak berat
-                if os.path.getsize(fpath) < MAX_EDITABLE_TEXT_BYTES:
-                    with open(fpath, "rb") as f:
-                        item["text"] = f.read().decode("utf-8", "replace")
-                else:
-                    item["text"] = "File terlalu besar untuk dipratinjau/edit."
-            except Exception:
-                item["text"] = "Error membaca file."
-                
-        files_meta.append(item)
+    return render_template('session.html',
+                           session_type=session_type,
+                           session_name=safe_name,
+                           items=items)
 
-    return render_template('session.html', session_type=session_type, session_name=safe_name, files=files_meta)
+# --- Note CRUD ---
 
-@app.route('/session/<session_type>/<session_name>/save/<path:filename>', methods=['POST'])
-def save_text_file(session_type, session_name, filename):
+@app.route('/session/<session_type>/<session_name>/note/add', methods=['POST'])
+def add_note_route(session_type, session_name):
     safe_name = safe_session_name(session_name)
-    safe_filename = secure_filename(filename)
-    session_dir = get_session_dir(session_type, safe_name)
-    file_path = os.path.join(session_dir, safe_filename)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
 
-    if not os.path.exists(file_path): return abort(404)
-    
-    new_content = request.form.get('content', '')
-    # Tulis dengan newline normal
-    with open(file_path, "w", encoding="utf-8", newline='') as f:
-        f.write(new_content)
+    content = request.form.get('content', '').strip()
+    if content:
+        add_note(session['id'], content)
 
     return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
+
+@app.route('/session/<session_type>/<session_name>/note/<int:note_id>/edit', methods=['POST'])
+def edit_note_route(session_type, session_name, note_id):
+    safe_name = safe_session_name(session_name)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
+
+    note = get_note(note_id)
+    if not note or note['session_id'] != session['id']: return abort(404)
+
+    content = request.form.get('content', '').strip()
+    if content:
+        update_note(note_id, content)
+
+    return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
+
+@app.route('/session/<session_type>/<session_name>/note/<int:note_id>/delete', methods=['POST'])
+def delete_note_route(session_type, session_name, note_id):
+    safe_name = safe_session_name(session_name)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
+
+    note = get_note(note_id)
+    if not note or note['session_id'] != session['id']: return abort(404)
+
+    delete_note(note_id)
+    return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
+
+# --- File Upload & Delete ---
 
 @app.route('/session/<session_type>/<session_name>/upload', methods=['POST'])
 def upload_to_session(session_type, session_name):
     safe_name = safe_session_name(session_name)
-    session_dir = get_session_dir(session_type, safe_name)
-    if not os.path.exists(session_dir): return "Sesi tidak ditemukan!", 404
+    session = get_session(safe_name, session_type)
+    if not session: return "Sesi tidak ditemukan!", 404
 
     uploaded_file = request.files.get('file')
     if uploaded_file and uploaded_file.filename:
-        filename = secure_filename(uploaded_file.filename)
-        uploaded_file.save(os.path.join(session_dir, filename))
+        save_uploaded_file(session['id'], uploaded_file)
 
+    return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
+
+@app.route('/session/<session_type>/<session_name>/file/<int:file_id>/delete', methods=['POST'])
+def delete_file_route(session_type, session_name, file_id):
+    safe_name = safe_session_name(session_name)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
+
+    file_record = get_file_by_id(file_id)
+    if not file_record or file_record['session_id'] != session['id']: return abort(404)
+
+    # Delete file from disk
+    if file_record['filepath']:
+        disk_path = os.path.join(UPLOAD_DIR, file_record['filepath'])
+        if os.path.exists(disk_path):
+            os.remove(disk_path)
+
+    delete_file_record(file_id)
     return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
 
 @app.route('/files/<session_type>/<session_name>/<path:filename>')
 def serve_file(session_type, session_name, filename):
     safe_name = safe_session_name(session_name)
-    session_dir = get_session_dir(session_type, safe_name)
-    return send_from_directory(session_dir, filename)
+    session = get_session(safe_name, session_type)
+    if not session: return abort(404)
+
+    file_record = get_file(session['id'], filename)
+    if not file_record: return abort(404)
+
+    if file_record['filepath']:
+        session_upload_dir = os.path.join(UPLOAD_DIR, str(session['id']))
+        return send_from_directory(session_upload_dir, filename)
+
+    return abort(404)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
