@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory, jsonify
 import os
+import shutil
 import mimetypes
 import random
 import re
@@ -7,14 +8,17 @@ import uuid
 from werkzeug.utils import secure_filename
 from database import (init_db, create_session, get_session, get_public_sessions,
                       get_session_files, save_file, get_file, get_file_by_id, delete_file_record,
-                      add_note, get_session_notes, get_note, update_note, delete_note)
+                      add_note, get_session_notes, get_note, update_note, delete_note,
+                      delete_expired_sessions)
 
 app = Flask(__name__)
-app.secret_key = 'super-secret-key-change-this'
+app.secret_key = 'sukamelon'
 
 # --- KONFIGURASI ---
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+SESSION_LIFETIME_HOURS = 24  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
 
 init_db(app)
 
@@ -22,6 +26,20 @@ SESSIONS_PER_PAGE = 10
 IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
 VIDEO_EXT = {"mp4", "webm", "ogg", "mov"}
 AUDIO_EXT = {"mp3", "wav", "ogg", "m4a"}
+
+@app.before_request
+def cleanup_expired_sessions():
+    """Auto-delete sessions older than SESSION_LIFETIME_HOURS on every request."""
+    try:
+        expired_ids = delete_expired_sessions(SESSION_LIFETIME_HOURS)
+        # Delete upload folders from disk
+        for sid in expired_ids:
+            folder = os.path.join(UPLOAD_DIR, str(sid))
+            if os.path.isdir(folder):
+                shutil.rmtree(folder, ignore_errors=True)
+    except Exception:
+        pass  # Jangan sampai cleanup error mengganggu request user
+
 
 def safe_session_name(name: str) -> str:
     cleaned = secure_filename(name).strip("._")

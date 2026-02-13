@@ -60,6 +60,25 @@ def init_db(app):
     app.teardown_appcontext(close_db)
 
 
+# --- Cleanup ---
+
+def delete_expired_sessions(hours=24):
+    """Delete sessions older than `hours` hours. Returns list of deleted session IDs."""
+    db = get_db()
+    expired = db.execute(
+        "SELECT id FROM sessions WHERE created_at <= datetime('now', ?)",
+        (f'-{hours} hours',)
+    ).fetchall()
+    expired_ids = [row['id'] for row in expired]
+    if expired_ids:
+        placeholders = ','.join('?' * len(expired_ids))
+        db.execute(f"DELETE FROM notes WHERE session_id IN ({placeholders})", expired_ids)
+        db.execute(f"DELETE FROM files WHERE session_id IN ({placeholders})", expired_ids)
+        db.execute(f"DELETE FROM sessions WHERE id IN ({placeholders})", expired_ids)
+        db.commit()
+    return expired_ids
+
+
 # --- Session Helpers ---
 
 def create_session(name, session_type, private_code=None):
