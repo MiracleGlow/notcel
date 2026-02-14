@@ -50,10 +50,18 @@ def init_db(app):
                 filepath     TEXT,
                 mimetype     TEXT,
                 kind         TEXT,
+                filesize     INTEGER DEFAULT 0,
                 created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(session_id, filename)
             );
         ''')
+
+        # Migrasi: tambah kolom filesize jika belum ada (untuk DB lama)
+        try:
+            db.execute("ALTER TABLE files ADD COLUMN filesize INTEGER DEFAULT 0")
+            db.commit()
+        except Exception:
+            pass  # Kolom sudah ada
         db.commit()
         db.close()
 
@@ -180,17 +188,18 @@ def get_session_files(session_id):
     ).fetchall()
 
 
-def save_file(session_id, filename, filepath=None, mimetype=None, kind=None):
+def save_file(session_id, filename, filepath=None, mimetype=None, kind=None, filesize=0):
     """Save a file record to a session."""
     db = get_db()
     db.execute(
-        """INSERT INTO files (session_id, filename, filepath, mimetype, kind)
-           VALUES (?, ?, ?, ?, ?)
+        """INSERT INTO files (session_id, filename, filepath, mimetype, kind, filesize)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(session_id, filename) DO UPDATE SET
                filepath = excluded.filepath,
                mimetype = excluded.mimetype,
-               kind = excluded.kind""",
-        (session_id, filename, filepath, mimetype, kind)
+               kind = excluded.kind,
+               filesize = excluded.filesize""",
+        (session_id, filename, filepath, mimetype, kind, filesize)
     )
     db.commit()
 
@@ -215,3 +224,13 @@ def delete_file_record(file_id):
     db = get_db()
     db.execute("DELETE FROM files WHERE id = ?", (file_id,))
     db.commit()
+
+
+def get_session_storage_usage(session_id):
+    """Get total storage used by a session in bytes."""
+    db = get_db()
+    row = db.execute(
+        "SELECT COALESCE(SUM(filesize), 0) as total FROM files WHERE session_id = ?",
+        (session_id,)
+    ).fetchone()
+    return row['total'] if row else 0

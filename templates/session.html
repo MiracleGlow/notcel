@@ -17,6 +17,25 @@
     </div>
 </div>
 
+<!-- Storage Progress Bar -->
+<div class="storage-bar-container mb-3" id="storageBarContainer">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="storage-label">
+            <i class="bi bi-hdd me-1"></i> Penyimpanan Sesi
+        </span>
+        <span class="storage-detail" id="storageText">
+            {{ storage_info.used_mb }} MB / {{ storage_info.limit_mb|int }} MB
+        </span>
+    </div>
+    <div class="storage-track">
+        <div class="storage-fill" id="storageFill" style="width: {{ storage_info.percentage }}%"
+            data-percentage="{{ storage_info.percentage }}"></div>
+    </div>
+    <div class="storage-percent text-end mt-1" id="storagePercent">
+        {{ storage_info.percentage }}% terpakai
+    </div>
+</div>
+
 <!-- Action Buttons: Tambah Catatan + Upload File side by side -->
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-sm btn-outline-primary rounded-pill px-3 flex-fill" type="button" data-bs-toggle="collapse"
@@ -51,14 +70,33 @@
 <div class="collapse mb-3" id="uploadCollapse">
     <div class="card border-0 shadow-sm">
         <div class="card-body">
-            <form method="POST"
-                action="{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}"
-                enctype="multipart/form-data">
+            <form id="uploadForm" enctype="multipart/form-data">
                 <div class="input-group">
-                    <input type="file" class="form-control bg-white" name="file" required>
-                    <button class="btn btn-primary" type="submit">
+                    <input type="file" class="form-control bg-white" name="file" id="fileInput" required>
+                    <button class="btn btn-primary" type="submit" id="uploadBtn">
                         <i class="bi bi-cloud-upload me-1"></i> Upload
                     </button>
+                </div>
+                <!-- File size info (shown after selecting file) -->
+                <div class="file-size-info d-none mt-2" id="fileSizeInfo">
+                    <small class="text-muted">
+                        <i class="bi bi-file-earmark me-1"></i>
+                        Ukuran: <span id="selectedFileSize">0</span>
+                    </small>
+                </div>
+                <!-- Upload progress -->
+                <div class="upload-progress-container d-none mt-2" id="uploadProgressContainer">
+                    <div class="upload-progress-track">
+                        <div class="upload-progress-fill" id="uploadProgressFill" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted" id="uploadProgressText">Mengupload... 0%</small>
+                </div>
+                <!-- Error message -->
+                <div class="upload-error d-none mt-2" id="uploadError">
+                    <div class="alert alert-danger alert-sm mb-0 py-2 px-3 d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="uploadErrorText"></span>
+                    </div>
                 </div>
             </form>
         </div>
@@ -78,7 +116,7 @@
                 <div class="note-content mb-2" style="white-space: pre-wrap; word-break: break-word;">{{ item.content }}
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ item.created_at }}</small>
+                    <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ item.created_at|format_waktu }}</small>
                     <div class="d-flex gap-1">
                         <button type="button" class="btn btn-sm btn-outline-secondary js-copy-note"
                             data-note-id="{{ item.id }}" title="Salin">
@@ -176,6 +214,10 @@
 
 {% block scripts %}
 <script>
+    const UPLOAD_URL = "{{ url_for('upload_to_session', session_type=session_type, session_name=session_name) }}";
+    const STORAGE_URL = "{{ url_for('session_storage', session_type=session_type, session_name=session_name) }}";
+    const MAX_SESSION_STORAGE = {{ storage_info.limit }};
+
     function closeOther(id) {
         const el = document.getElementById(id);
         if (el && el.classList.contains('show')) {
@@ -183,7 +225,157 @@
         }
     }
 
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function updateStorageBar(data) {
+        const fill = document.getElementById('storageFill');
+        const text = document.getElementById('storageText');
+        const percent = document.getElementById('storagePercent');
+        if (fill && text && percent) {
+            fill.style.width = data.percentage + '%';
+            fill.dataset.percentage = data.percentage;
+            // Update color class
+            fill.className = 'storage-fill';
+            if (data.percentage >= 90) fill.classList.add('storage-danger');
+            else if (data.percentage >= 70) fill.classList.add('storage-warning');
+            text.textContent = data.used_mb + ' MB / ' + parseInt(data.limit_mb) + ' MB';
+            percent.textContent = data.percentage + '% terpakai';
+        }
+    }
+
+    function refreshStorage() {
+        fetch(STORAGE_URL)
+            .then(r => r.json())
+            .then(data => updateStorageBar(data))
+            .catch(() => { });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+        // --- File Input: show selected file size ---
+        const fileInput = document.getElementById('fileInput');
+        const fileSizeInfo = document.getElementById('fileSizeInfo');
+        const selectedFileSize = document.getElementById('selectedFileSize');
+
+        fileInput.addEventListener('change', () => {
+            const uploadError = document.getElementById('uploadError');
+            uploadError.classList.add('d-none');
+
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                selectedFileSize.textContent = formatBytes(file.size);
+                fileSizeInfo.classList.remove('d-none');
+
+                // Client-side validation
+                if (file.size > MAX_SESSION_STORAGE) {
+                    showUploadError('File terlalu besar! Maksimal ' + (MAX_SESSION_STORAGE / (1024 * 1024)) + 'MB.');
+                }
+            } else {
+                fileSizeInfo.classList.add('d-none');
+            }
+        });
+
+        // --- AJAX Upload ---
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progressContainer = document.getElementById('uploadProgressContainer');
+        const progressFill = document.getElementById('uploadProgressFill');
+        const progressText = document.getElementById('uploadProgressText');
+
+        uploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            if (!fileInput.files.length) return;
+
+            const file = fileInput.files[0];
+
+            // Client-side validation
+            if (file.size > MAX_SESSION_STORAGE) {
+                showUploadError('File terlalu besar! Maksimal ' + (MAX_SESSION_STORAGE / (1024 * 1024)) + 'MB.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+
+            // Show progress
+            uploadBtn.disabled = true;
+            fileInput.disabled = true;
+            progressContainer.classList.remove('d-none');
+            document.getElementById('uploadError').classList.add('d-none');
+
+            xhr.upload.addEventListener('progress', (evt) => {
+                if (evt.lengthComputable) {
+                    const pct = Math.round((evt.loaded / evt.total) * 100);
+                    progressFill.style.width = pct + '%';
+                    progressText.textContent = 'Mengupload... ' + pct + '%';
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                uploadBtn.disabled = false;
+                fileInput.disabled = false;
+
+                if (xhr.status === 200) {
+                    // Upload success — reload page to show new file
+                    progressText.textContent = 'Upload selesai! Memuat ulang...';
+                    progressFill.style.width = '100%';
+                    window.location.reload();
+                } else {
+                    progressContainer.classList.add('d-none');
+                    try {
+                        const resp = JSON.parse(xhr.responseText);
+                        showUploadError(resp.error || 'Upload gagal.');
+                    } catch {
+                        showUploadError('Upload gagal. Status: ' + xhr.status);
+                    }
+                    // Refresh storage bar in case it changed
+                    refreshStorage();
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                uploadBtn.disabled = false;
+                fileInput.disabled = false;
+                progressContainer.classList.add('d-none');
+                showUploadError('Koneksi gagal. Coba lagi.');
+            });
+
+            xhr.open('POST', UPLOAD_URL);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.send(formData);
+        });
+
+        function showUploadError(msg) {
+            const el = document.getElementById('uploadError');
+            document.getElementById('uploadErrorText').textContent = msg;
+            el.classList.remove('d-none');
+        }
+
+        // --- Initialize storage bar color ---
+        const fill = document.getElementById('storageFill');
+        if (fill) {
+            const pct = parseFloat(fill.dataset.percentage);
+            if (pct >= 90) fill.classList.add('storage-danger');
+            else if (pct >= 70) fill.classList.add('storage-warning');
+        }
+
+        // --- Refresh storage after file delete ---
+        document.querySelectorAll('form[action*="/delete"]').forEach(form => {
+            const origSubmit = form.onsubmit;
+            form.addEventListener('submit', () => {
+                // After a short delay, refresh storage
+                setTimeout(refreshStorage, 1500);
+            });
+        });
+
         // Copy Note
         document.querySelectorAll('.js-copy-note').forEach(btn => {
             btn.addEventListener('click', () => {

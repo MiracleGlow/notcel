@@ -4,19 +4,41 @@ import shutil
 import mimetypes
 import random
 import re
+from datetime import datetime
 import uuid
 from werkzeug.utils import secure_filename
 from database import (init_db, create_session, get_session, get_public_sessions,
                       get_session_files, save_file, get_file, get_file_by_id, delete_file_record,
                       add_note, get_session_notes, get_note, update_note, delete_note,
-                      delete_expired_sessions)
+                      delete_expired_sessions, get_session_storage_usage)
 
 app = Flask(__name__)
 app.secret_key = 'sukamelon'
 
+# --- FILTER JINJA2 ---
+HARI_INDO = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+BULAN_INDO = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+
+@app.template_filter('format_waktu')
+def format_waktu(value):
+    """Format datetime string ke format Indonesia: Jumat, 14 Feb 2026 • 16:50"""
+    try:
+        if isinstance(value, str):
+            dt = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+        else:
+            dt = value
+        hari = HARI_INDO[dt.weekday()]
+        bulan = BULAN_INDO[dt.month]
+        return f"{hari}, {dt.day} {bulan} {dt.year} • {dt.strftime('%H:%M')}"
+    except Exception:
+        return value
+
 # --- KONFIGURASI ---
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+MAX_SESSION_STORAGE = 128 * 1024 * 1024  # 128MB total per sesi
+app.config['MAX_CONTENT_LENGTH'] = MAX_SESSION_STORAGE  # Flask built-in protection
 
 SESSION_LIFETIME_HOURS = 24  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
 
@@ -67,7 +89,7 @@ def make_unique_filename(original_filename: str) -> str:
         return f"{safe_name}_{uuid.uuid4().hex[:8]}"
 
 def save_uploaded_file(session_id, uploaded_file):
-    """Save an uploaded file to static/uploads/<session_id>/ and record in DB."""
+    """Save an uploaded file to static/uploads/<session_id>/ and record in DB. Returns filesize."""
     original_name = uploaded_file.filename
     unique_filename = make_unique_filename(original_name)
     
@@ -77,6 +99,9 @@ def save_uploaded_file(session_id, uploaded_file):
     disk_path = os.path.join(session_upload_dir, unique_filename)
     uploaded_file.save(disk_path)
     
+    # Get actual file size from disk
+    filesize = os.path.getsize(disk_path)
+    
     relative_path = f"{session_id}/{unique_filename}"
     file_mimetype = mimetypes.guess_type(unique_filename)[0] or ""
     file_kind = classify_file(unique_filename)
@@ -84,7 +109,23 @@ def save_uploaded_file(session_id, uploaded_file):
     save_file(session_id, unique_filename,
              filepath=relative_path,
              mimetype=file_mimetype,
-             kind=file_kind)
+             kind=file_kind,
+             filesize=filesize)
+    return filesize
+
+
+def get_storage_info(session_id):
+    """Get storage usage info for a session."""
+    used = get_session_storage_usage(session_id)
+    limit = MAX_SESSION_STORAGE
+    percentage = round((used / limit) * 100, 1) if limit > 0 else 0
+    return {
+        'used': used,
+        'limit': limit,
+        'used_mb': round(used / (1024 * 1024), 2),
+        'limit_mb': round(limit / (1024 * 1024), 0),
+        'percentage': min(percentage, 100),
+    }
 
 
 # --- ROUTES ---
@@ -175,6 +216,7 @@ def edit_session(session_type, session_name):
 
     notes = get_session_notes(session['id'])
     db_files = get_session_files(session['id'])
+    storage_info = get_storage_info(session['id'])
 
     # Build unified items list
     items = []
@@ -202,7 +244,8 @@ def edit_session(session_type, session_name):
     return render_template('session.html',
                            session_type=session_type,
                            session_name=safe_name,
-                           items=items)
+                           items=items,
+                           storage_info=storage_info)
 
 # --- Note CRUD ---
 
@@ -251,13 +294,61 @@ def delete_note_route(session_type, session_name, note_id):
 def upload_to_session(session_type, session_name):
     safe_name = safe_session_name(session_name)
     session = get_session(safe_name, session_type)
-    if not session: return "Sesi tidak ditemukan!", 404
+    if not session:
+        return jsonify({'error': 'Sesi tidak ditemukan!'}), 404
 
     uploaded_file = request.files.get('file')
-    if uploaded_file and uploaded_file.filename:
-        save_uploaded_file(session['id'], uploaded_file)
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({'error': 'Tidak ada file yang dipilih.'}), 400
+
+    # Check file size via Content-Length header (quick pre-check)
+    content_length = request.content_length
+    if content_length and content_length > MAX_SESSION_STORAGE:
+        return jsonify({'error': f'File terlalu besar! Maksimal {MAX_SESSION_STORAGE // (1024*1024)}MB per sesi.'}), 413
+
+    # Check remaining session storage
+    current_usage = get_session_storage_usage(session['id'])
+    remaining = MAX_SESSION_STORAGE - current_usage
+
+    # Save file to temp first to check actual size
+    uploaded_file.seek(0, 2)  # Seek to end
+    file_size = uploaded_file.tell()  # Get position = file size
+    uploaded_file.seek(0)  # Seek back to start
+
+    if file_size > remaining:
+        used_mb = round(current_usage / (1024 * 1024), 1)
+        limit_mb = MAX_SESSION_STORAGE // (1024 * 1024)
+        return jsonify({
+            'error': f'Penyimpanan sesi penuh! Terpakai {used_mb}MB dari {limit_mb}MB. '
+                     f'Sisa ruang: {round(remaining / (1024*1024), 1)}MB.'
+        }), 413
+
+    save_uploaded_file(session['id'], uploaded_file)
+    storage_info = get_storage_info(session['id'])
+
+    # Support both AJAX and regular form submission
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'storage': storage_info})
 
     return redirect(url_for('edit_session', session_type=session_type, session_name=safe_name))
+
+
+@app.route('/session/<session_type>/<session_name>/storage')
+def session_storage(session_type, session_name):
+    """API endpoint to get session storage info."""
+    safe_name = safe_session_name(session_name)
+    session = get_session(safe_name, session_type)
+    if not session:
+        return jsonify({'error': 'Sesi tidak ditemukan!'}), 404
+    return jsonify(get_storage_info(session['id']))
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Handle file too large error from Flask's MAX_CONTENT_LENGTH."""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'error': f'File terlalu besar! Maksimal {MAX_SESSION_STORAGE // (1024*1024)}MB.'}), 413
+    return f'File terlalu besar! Maksimal {MAX_SESSION_STORAGE // (1024*1024)}MB.', 413
 
 @app.route('/session/<session_type>/<session_name>/file/<int:file_id>/delete', methods=['POST'])
 def delete_file_route(session_type, session_name, file_id):
