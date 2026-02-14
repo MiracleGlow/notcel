@@ -109,7 +109,7 @@
     {% for item in items %}
     {% if item.type == 'note' %}
     <!-- ===== NOTE CARD ===== -->
-    <div class="card border-0 shadow-sm" id="note-{{ item.id }}">
+    <div class="card border-0 shadow-sm item-card" id="note-{{ item.id }}">
         <div class="card-body py-3 px-3">
             <!-- View Mode -->
             <div class="note-view" id="note-view-{{ item.id }}">
@@ -117,22 +117,24 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ item.created_at|format_waktu }}</small>
-                    <div class="d-flex gap-1">
-                        <button type="button" class="btn btn-sm btn-outline-secondary js-copy-note"
-                            data-note-id="{{ item.id }}" title="Salin">
-                            <i class="bi bi-clipboard"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-primary js-edit-note"
-                            data-note-id="{{ item.id }}" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <form method="POST"
-                            action="{{ url_for('delete_note_route', session_type=session_type, session_name=session_name, note_id=item.id) }}"
-                            class="d-inline" onsubmit="return confirm('Hapus catatan ini?')">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                <i class="bi bi-trash"></i>
+                    <div class="item-actions">
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-copy-note"
+                                data-note-id="{{ item.id }}" title="Salin">
+                                <i class="bi bi-clipboard"></i>
                             </button>
-                        </form>
+                            <button type="button" class="btn btn-sm btn-outline-primary js-edit-note"
+                                data-note-id="{{ item.id }}" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST"
+                                action="{{ url_for('delete_note_route', session_type=session_type, session_name=session_name, note_id=item.id) }}"
+                                class="d-inline" onsubmit="return confirm('Hapus catatan ini?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -155,7 +157,7 @@
 
     {% elif item.type == 'file' %}
     <!-- ===== FILE CARD ===== -->
-    <div class="card border-0 shadow-sm overflow-hidden">
+    <div class="card border-0 shadow-sm overflow-hidden item-card">
         <!-- File Preview -->
         {% if item.kind == 'image' %}
         <div class="bg-light text-center p-2">
@@ -186,17 +188,19 @@
                         me-2 fs-5"></i>
                 <span class="text-truncate small fw-medium" style="max-width: 180px;">{{ item.name }}</span>
             </div>
-            <div class="d-flex gap-1">
-                <a href="{{ item.url }}" download class="btn btn-sm btn-outline-primary" title="Download">
-                    <i class="bi bi-download"></i>
-                </a>
-                <form method="POST"
-                    action="{{ url_for('delete_file_route', session_type=session_type, session_name=session_name, file_id=item.id) }}"
-                    class="d-inline" onsubmit="return confirm('Hapus file ini?')">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </form>
+            <div class="item-actions">
+                <div class="d-flex gap-1">
+                    <a href="{{ item.url }}" download class="btn btn-sm btn-outline-primary" title="Download">
+                        <i class="bi bi-download"></i>
+                    </a>
+                    <form method="POST"
+                        action="{{ url_for('delete_file_route', session_type=session_type, session_name=session_name, file_id=item.id) }}"
+                        class="d-inline" onsubmit="return confirm('Hapus file ini?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -257,6 +261,32 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // --- Item Card: click to toggle action buttons ---
+        document.querySelectorAll('.item-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Don't toggle if clicking on interactive elements inside actions
+                const target = e.target.closest('button, a, form, input, textarea, video, audio');
+                if (target) return;
+
+                const isActive = card.classList.contains('active');
+
+                // Close all other active cards
+                document.querySelectorAll('.item-card.active').forEach(c => {
+                    if (c !== card) c.classList.remove('active');
+                });
+
+                // Toggle this card
+                card.classList.toggle('active');
+            });
+        });
+
+        // Close active cards when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.item-card')) {
+                document.querySelectorAll('.item-card.active').forEach(c => c.classList.remove('active'));
+            }
+        });
+
         // --- File Input: show selected file size ---
         const fileInput = document.getElementById('fileInput');
         const fileSizeInfo = document.getElementById('fileSizeInfo');

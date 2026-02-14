@@ -242,3 +242,40 @@ textarea.code-editor {
     font-size: 0.82rem;
     border-radius: var(--btn-radius);
 }
+
+/* ===== Item Card: Click-to-Reveal Actions ===== */
+.item-card {
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.item-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.item-card.active {
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.12);
+    border: 1px solid rgba(13, 110, 253, 0.2) !important;
+}
+
+.item-actions {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+    transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.item-actions>* {
+    overflow: hidden;
+}
+
+.item-card.active .item-actions {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
