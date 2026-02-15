@@ -37,10 +37,10 @@ def format_waktu(value):
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-MAX_SESSION_STORAGE = 128 * 1024 * 1024  # 128MB total per sesi
+MAX_SESSION_STORAGE = 140 * 1024 * 1024  # 128MB total per sesi
 app.config['MAX_CONTENT_LENGTH'] = MAX_SESSION_STORAGE  # Flask built-in protection
 
-SESSION_LIFETIME_HOURS = 24  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
+SESSION_LIFETIME_HOURS = 3  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
 
 init_db(app)
 
