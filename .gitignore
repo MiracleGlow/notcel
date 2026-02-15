@@ -1,4 +1,4 @@
 static/uploads/
-*.db
+nocel.db
 __pycache__/
 .env

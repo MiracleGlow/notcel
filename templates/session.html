@@ -15,24 +15,38 @@
             <h1 class="h5 fw-bold mb-0 text-break">{{ session_name }}</h1>
         </div>
     </div>
-</div>
-
-<!-- Storage Progress Bar -->
-<div class="storage-bar-container mb-3" id="storageBarContainer">
-    <div class="d-flex justify-content-between align-items-center mb-1">
-        <span class="storage-label">
-            <i class="bi bi-hdd me-1"></i> Penyimpanan Sesi
-        </span>
-        <span class="storage-detail" id="storageText">
-            {{ storage_info.used_mb }} MB / {{ storage_info.limit_mb|int }} MB
-        </span>
-    </div>
-    <div class="storage-track">
-        <div class="storage-fill" id="storageFill" style="width: {{ storage_info.percentage }}%"
-            data-percentage="{{ storage_info.percentage }}"></div>
-    </div>
-    <div class="storage-percent text-end mt-1" id="storagePercent">
-        {{ storage_info.percentage }}% terpakai
+    <!-- Storage Pie Chart -->
+    <div class="storage-pie-wrapper" id="storagePieWrapper" data-used="{{ storage_info.used }}"
+        data-limit="{{ storage_info.limit }}" data-used-mb="{{ storage_info.used_mb }}"
+        data-limit-mb="{{ storage_info.limit_mb|int }}" data-percentage="{{ storage_info.percentage }}">
+        <canvas id="storagePieCanvas" width="38" height="38"></canvas>
+        <!-- Floating Storage Popup -->
+        <div class="storage-popup" id="storagePopup">
+            <div class="storage-popup-title">
+                <i class="bi bi-hdd-fill me-1"></i> Penyimpanan Sesi
+            </div>
+            <div class="storage-popup-chart">
+                <canvas id="storagePieCanvasLarge" width="80" height="80"></canvas>
+                <div class="storage-popup-percent" id="popupPercent">{{ storage_info.percentage }}%</div>
+            </div>
+            <div class="storage-popup-details">
+                <div class="storage-popup-row">
+                    <span class="storage-popup-dot used"></span>
+                    <span>Terpakai</span>
+                    <strong id="popupUsed">{{ storage_info.used_mb }} MB</strong>
+                </div>
+                <div class="storage-popup-row">
+                    <span class="storage-popup-dot free"></span>
+                    <span>Tersisa</span>
+                    <strong id="popupFree">{{ (storage_info.limit_mb|int - storage_info.used_mb)|round(2) }} MB</strong>
+                </div>
+                <div class="storage-popup-divider"></div>
+                <div class="storage-popup-row total">
+                    <span>Total</span>
+                    <strong id="popupTotal">{{ storage_info.limit_mb|int }} MB</strong>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -237,26 +251,80 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    function updateStorageBar(data) {
-        const fill = document.getElementById('storageFill');
-        const text = document.getElementById('storageText');
-        const percent = document.getElementById('storagePercent');
-        if (fill && text && percent) {
-            fill.style.width = data.percentage + '%';
-            fill.dataset.percentage = data.percentage;
-            // Update color class
-            fill.className = 'storage-fill';
-            if (data.percentage >= 90) fill.classList.add('storage-danger');
-            else if (data.percentage >= 70) fill.classList.add('storage-warning');
-            text.textContent = data.used_mb + ' MB / ' + parseInt(data.limit_mb) + ' MB';
-            percent.textContent = data.percentage + '% terpakai';
+    function getStorageColor(pct) {
+        if (pct >= 90) return { main: '#ef4444', gradient: ['#ef4444', '#f87171'], bg: '#fee2e2' };
+        if (pct >= 70) return { main: '#f59e0b', gradient: ['#f59e0b', '#fbbf24'], bg: '#fef3c7' };
+        return { main: '#22c55e', gradient: ['#22c55e', '#34d399'], bg: '#dcfce7' };
+    }
+
+    function drawPie(canvas, percentage, size, lineWidth) {
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+        canvas.style.width = size + 'px';
+        canvas.style.height = size + 'px';
+        ctx.scale(dpr, dpr);
+
+        const cx = size / 2, cy = size / 2, radius = (size / 2) - lineWidth;
+        const colors = getStorageColor(percentage);
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + (2 * Math.PI * (percentage / 100));
+
+        ctx.clearRect(0, 0, size, size);
+
+        // Background circle
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#e9ecef';
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+
+        // Filled arc
+        if (percentage > 0) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, startAngle, endAngle);
+            ctx.strokeStyle = colors.main;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
         }
+    }
+
+    function drawAllPies(pct) {
+        drawPie(document.getElementById('storagePieCanvas'), pct, 38, 4);
+        const largeCanvas = document.getElementById('storagePieCanvasLarge');
+        if (largeCanvas) drawPie(largeCanvas, pct, 80, 6);
+    }
+
+    function updateStoragePie(data) {
+        const wrapper = document.getElementById('storagePieWrapper');
+        if (!wrapper) return;
+        wrapper.dataset.percentage = data.percentage;
+        wrapper.dataset.usedMb = data.used_mb;
+        wrapper.dataset.limitMb = parseInt(data.limit_mb);
+
+        drawAllPies(data.percentage);
+
+        // Update popup texts
+        const popupPercent = document.getElementById('popupPercent');
+        const popupUsed = document.getElementById('popupUsed');
+        const popupFree = document.getElementById('popupFree');
+        const popupTotal = document.getElementById('popupTotal');
+        if (popupPercent) popupPercent.textContent = data.percentage + '%';
+        if (popupUsed) popupUsed.textContent = data.used_mb + ' MB';
+        if (popupFree) popupFree.textContent = (parseInt(data.limit_mb) - data.used_mb).toFixed(2) + ' MB';
+        if (popupTotal) popupTotal.textContent = parseInt(data.limit_mb) + ' MB';
+
+        // Update color of percent text
+        const colors = getStorageColor(data.percentage);
+        if (popupPercent) popupPercent.style.color = colors.main;
     }
 
     function refreshStorage() {
         fetch(STORAGE_URL)
             .then(r => r.json())
-            .then(data => updateStorageBar(data))
+            .then(data => updateStoragePie(data))
             .catch(() => { });
     }
 
@@ -389,12 +457,41 @@
             el.classList.remove('d-none');
         }
 
-        // --- Initialize storage bar color ---
-        const fill = document.getElementById('storageFill');
-        if (fill) {
-            const pct = parseFloat(fill.dataset.percentage);
-            if (pct >= 90) fill.classList.add('storage-danger');
-            else if (pct >= 70) fill.classList.add('storage-warning');
+        // --- Initialize Pie Chart ---
+        const pieWrapper = document.getElementById('storagePieWrapper');
+        if (pieWrapper) {
+            const pct = parseFloat(pieWrapper.dataset.percentage);
+            drawAllPies(pct);
+
+            // Set initial popup percent color
+            const popupPercent = document.getElementById('popupPercent');
+            if (popupPercent) {
+                popupPercent.style.color = getStorageColor(pct).main;
+            }
+
+            // Draw large pie when popup becomes visible
+            const popup = document.getElementById('storagePopup');
+
+            // Prevent clicks inside popup from toggling it off
+            popup.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // Toggle pinned state via click on pie (not popup)
+            pieWrapper.addEventListener('click', (e) => {
+                e.stopPropagation();
+                popup.classList.toggle('active');
+                if (popup.classList.contains('active')) {
+                    drawPie(document.getElementById('storagePieCanvasLarge'), pct, 80, 6);
+                }
+            });
+
+            // Close pinned popup when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.storage-pie-wrapper')) {
+                    popup.classList.remove('active');
+                }
+            });
         }
 
         // --- Refresh storage after file delete ---
