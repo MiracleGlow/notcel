@@ -45,6 +45,11 @@
                     <span>Total</span>
                     <strong id="popupTotal">{{ storage_info.limit_mb|int }} MB</strong>
                 </div>
+                <div class="storage-popup-divider"></div>
+                <div class="storage-popup-row text-muted" style="font-size: 0.75rem;">
+                    <span><i class="bi bi-clock-history me-1"></i> Sisa Waktu</span>
+                    <strong>{{ remaining_time_str }}</strong>
+                </div>
             </div>
         </div>
     </div>

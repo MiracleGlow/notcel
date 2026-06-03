@@ -1,10 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for, abort, send_from_directory, jsonify
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import shutil
 import mimetypes
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from werkzeug.utils import secure_filename
 from database import (init_db, create_session, get_session, get_public_sessions,
@@ -27,6 +31,10 @@ def format_waktu(value):
             dt = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
         else:
             dt = value
+            
+        # SQLite menyimpan waktu dalam UTC, tambahkan offset untuk waktu lokal
+        dt = dt + timedelta(hours=TIMEZONE_OFFSET)
+        
         hari = HARI_INDO[dt.weekday()]
         bulan = BULAN_INDO[dt.month]
         return f"{hari}, {dt.day} {bulan} {dt.year} • {dt.strftime('%H:%M')}"
@@ -37,10 +45,13 @@ def format_waktu(value):
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-MAX_SESSION_STORAGE = 140 * 1024 * 1024  # 128MB total per sesi
+MAX_SESSION_STORAGE_MB = int(os.environ.get('MAX_SESSION_STORAGE_MB', 140))
+MAX_SESSION_STORAGE = MAX_SESSION_STORAGE_MB * 1024 * 1024
 app.config['MAX_CONTENT_LENGTH'] = MAX_SESSION_STORAGE  # Flask built-in protection
 
-SESSION_LIFETIME_HOURS = 3  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
+SESSION_LIFETIME_HOURS = int(os.environ.get('SESSION_LIFETIME_HOURS', 3))  # Sesi dihapus otomatis setelah X jam (ubah angka ini sesuai kebutuhan)
+
+TIMEZONE_OFFSET = int(os.environ.get('TIMEZONE_OFFSET', 7))  # Offset waktu dalam jam (misal 7 untuk WIB)
 
 init_db(app)
 
@@ -241,11 +252,27 @@ def edit_session(session_type, session_name):
     # Sort by creation time (oldest first)
     items.sort(key=lambda x: x['created_at'])
 
+    # Calculate remaining time
+    session_created_at = datetime.strptime(session['created_at'], '%Y-%m-%d %H:%M:%S')
+    expire_time = session_created_at + timedelta(hours=SESSION_LIFETIME_HOURS)
+    now_utc = datetime.utcnow()
+    remaining_delta = expire_time - now_utc
+    if remaining_delta.total_seconds() > 0:
+        hours, remainder = divmod(remaining_delta.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        if hours > 0:
+            remaining_time_str = f"{hours}j {minutes}m"
+        else:
+            remaining_time_str = f"{minutes}m"
+    else:
+        remaining_time_str = "Hampir habis"
+
     return render_template('session.html',
                            session_type=session_type,
                            session_name=safe_name,
                            items=items,
-                           storage_info=storage_info)
+                           storage_info=storage_info,
+                           remaining_time_str=remaining_time_str)
 
 # --- Note CRUD ---
 

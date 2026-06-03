@@ -2,3 +2,4 @@ static/uploads/
 nocel.db
 __pycache__/
 .env
+venv/
