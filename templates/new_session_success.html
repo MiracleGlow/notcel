@@ -24,7 +24,17 @@
                 </button>
             </div>
             
-            <a href="{{ url_for('edit_session', session_type='private', session_name=session_name) }}" class="btn btn-primary w-100 shadow-sm py-2">
+            {% if qr_b64 %}
+            <div class="mt-4 text-center">
+                <p class="small text-muted mb-2">Scan QR Code ini untuk akses cepat:</p>
+                <div class="bg-white p-2 d-inline-block rounded shadow-sm border border-success">
+                    <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code Akses" class="img-fluid rounded" style="max-width: 150px;">
+                </div>
+                <p class="small text-muted mt-2 mb-0" style="font-size: 0.75rem;">(Tekan tahan/klik kanan untuk menyimpan QR code)</p>
+            </div>
+            {% endif %}
+            
+            <a href="{{ url_for('edit_session', session_type='private', session_name=session_name) }}" class="btn btn-primary w-100 shadow-sm py-2 mt-4">
                 Buka Sesi Sekarang <i class="bi bi-arrow-right ms-1"></i>
             </a>
         </div>

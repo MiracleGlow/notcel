@@ -10,6 +10,10 @@ import random
 import re
 from datetime import datetime, timedelta
 import uuid
+import secrets
+import qrcode
+import io
+import base64
 from werkzeug.utils import secure_filename
 from database import (init_db, create_session, get_session, get_public_sessions,
                       get_session_files, save_file, get_file, get_file_by_id, delete_file_record,
@@ -169,12 +173,28 @@ def index():
 @app.route('/access-private', methods=['POST'])
 def access_private():
     code = request.form.get('private_code', '').strip()
-    if not code or len(code) <= 4:
-        return "Kode privat tidak valid (terlalu pendek).", 400
+    if not code:
+        return "Kode privat tidak valid.", 400
 
-    session_name_part = code[:-4]
-    code_part = code[-4:]
+    if '-' in code:
+        session_name_part, code_part = code.rsplit('-', 1)
+    else:
+        return "Format kode tidak valid (harus mengandung '-').", 400
 
+    safe_name = safe_session_name(session_name_part)
+    session = get_session(safe_name, 'private')
+
+    if session and session['private_code'] == code_part:
+        return redirect(url_for('edit_session', session_type='private', session_name=safe_name))
+
+    return "Kode privat salah atau sesi tidak ditemukan.", 404
+
+@app.route('/access/<path:code>')
+def access_private_link(code):
+    if not code or '-' not in code:
+        return "Kode privat tidak valid.", 400
+        
+    session_name_part, code_part = code.rsplit('-', 1)
     safe_name = safe_session_name(session_name_part)
     session = get_session(safe_name, 'private')
 
@@ -197,14 +217,14 @@ def new_session(session_type):
 
         private_code = None
         if session_type == 'private':
-            private_code = str(random.randint(1000, 9999))
+            private_code = secrets.token_hex(4)
 
         session = create_session(session_name, session_type, private_code)
         if session is None:
             return "Nama sesi sudah digunakan. Harap pilih nama lain.", 409
 
         if session_type == 'private':
-            full_code = f"{session_name}{private_code}"
+            full_code = f"{session_name}-{private_code}"
             return redirect(url_for('new_session_success', session_name=session_name, code=full_code))
 
         return redirect(url_for('edit_session', session_type='public', session_name=session_name))
@@ -215,7 +235,27 @@ def new_session(session_type):
 def new_session_success():
     session_name = request.args.get('session_name')
     code = request.args.get('code')
-    return render_template('new_session_success.html', session_name=session_name, code=code)
+    
+    qr_b64 = None
+    if code:
+        # Generate QR Code
+        access_url = request.host_url.rstrip('/') + url_for('access_private_link', code=code)
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(access_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to base64
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        qr_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        
+    return render_template('new_session_success.html', session_name=session_name, code=code, qr_b64=qr_b64)
 
 @app.route('/session/<session_type>/<session_name>')
 def edit_session(session_type, session_name):
